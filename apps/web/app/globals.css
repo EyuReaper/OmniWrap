@@ -1,8 +1,11 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --spotify-green: #1DB954;
+  --youtube-red: #FF0000;
+  --github-purple: #6F42C1;
+  --bg-dark: #121212;
+  --text-light: #FFFFFF;
 }
 
 @theme inline {
@@ -20,7 +23,5 @@
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  @apply bg-[var(--bg-dark)] text-[var(--text-light)] font-sans;
 }
