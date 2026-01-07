@@ -1,11 +1,19 @@
 {
+  "name": "omniwrap",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
     "dev": "cd apps/web && npm run dev",
     "build": "cd apps/web && npm run build",
     "start": "cd apps/web && npm run start"
   },
-
-{
-  "workspaces": ["apps/*", "packages/*"]
-}
+  "devDependencies": {
+    "dotenv": "^17.2.3",
+    "prisma": "^7.2.0",
+    "typescript": "^5"
+  }
 }
