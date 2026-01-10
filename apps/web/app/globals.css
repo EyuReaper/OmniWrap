@@ -21,6 +21,13 @@
     --foreground: #ededed;
   }
 }
+@keyframes pulse-slow {
+  0%, 100% { opacity: 0.4; transform: scale(1); }
+  50% { opacity: 0.8; transform: scale(1.2); }
+}
+.animate-pulse-slow {
+  animation: pulse-slow 5s infinite ease-in-out;
+}
 
 body {
   @apply bg-[var(--bg-dark)] text-[var(--text-light)] font-sans;
