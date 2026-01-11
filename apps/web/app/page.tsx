@@ -1,29 +1,48 @@
-'use client';
+'use client';  // ← Makes it client-only
 
 import { motion } from 'framer-motion';
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
 
 export default function Home() {
+  const [particles, setParticles] = useState([]);
+
+  useEffect(() => {
+    // Only run on client
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+
+    const newParticles = [...Array(50)].map((_, i) => ({
+      key: i,
+      left: `${Math.random() * 100}%`,
+      initialX: Math.random() * width,
+      initialY: height + 10,
+      animateX: Math.random() * width,
+    }));
+
+    setParticles(newParticles);
+  }, []);  // Empty array: run once on mount
+
   return (
     <div className="min-h-screen relative bg-black flex flex-col overflow-hidden">
       {/* Floating Particles Background */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="particles absolute inset-0 opacity-30">
-          {[...Array(50)].map((_, i) => (
+          {particles.map((p) => (
             <motion.div
-              key={i}
+              key={p.key}
               className="absolute w-1 h-1 bg-white rounded-full"
-              initial={{ x: Math.random() * window.innerWidth, y: window.innerHeight + 10 }}
+              initial={{ x: p.initialX, y: p.initialY }}
               animate={{
                 y: -10,
-                x: Math.random() * window.innerWidth,
+                x: p.animateX,
               }}
               transition={{
                 duration: Math.random() * 20 + 20,
                 repeat: Infinity,
                 ease: "linear",
               }}
-              style={{ left: `${Math.random() * 100}vw` }}
+              style={{ left: p.left }}
             />
           ))}
         </div>
@@ -49,7 +68,6 @@ export default function Home() {
 
       {/* Main Hero */}
       <main className="relative z-10 flex-1 flex flex-col items-center justify-center px-8 text-center">
-        {/* Hero content same as before, with minor tweaks */}
         <motion.h1
           initial={{ opacity: 0, y: 50 }}
           animate={{ opacity: 1, y: 0 }}
@@ -93,10 +111,6 @@ export default function Home() {
             </motion.button>
           </Link>
         </motion.div>
-
-        {/* Feature cards and stats teaser remain similar */}
-        {/* ... (keep your existing feature cards here) ... */}
-
       </main>
 
       {/* Enhanced Footer */}
@@ -108,7 +122,7 @@ export default function Home() {
             transition={{ delay: 2 }}
             className="text-gray-400 text-lg"
           >
-            © 2026 Made with 🔥 by{' '}
+            © 2026 Made with 🔥 by
             <a
               href="https://x.com/EyuReaper"
               target="_blank"
