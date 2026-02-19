@@ -8,6 +8,7 @@ import GitHub from "next-auth/providers/github";
 import LinkedInProvider from "next-auth/providers/linkedin";
 import StravaProvider from "next-auth/providers/strava";
 import AppleProvider from "next-auth/providers/apple";
+import { encrypt } from "@/lib/crypto";
 
 
 // Custom provider stubs (uncomment when ready to implement)
@@ -81,15 +82,11 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
       clientId: process.env.GITHUB_CLIENT_ID || '',
       clientSecret: process.env.GITHUB_CLIENT_SECRET || '',
     }),
+    StravaProvider({
+      clientId: process.env.STRAVA_CLIENT_ID || '',
+      clientSecret: process.env.STRAVA_CLIENT_SECRET || '',
+    }),
     // LinkedInProvider({
-    //   clientId: process.env.LINKEDIN_CLIENT_ID || '',
-    //   clientSecret: process.env.LINKEDIN_CLIENT_SECRET || '',
-    //   authorization: { params: { scope: "r_liteprofile r_emailaddress" } },
-    // }),
-    // StravaProvider({
-    //   clientId: process.env.STRAVA_CLIENT_ID || '',
-    //   clientSecret: process.env.STRAVA_CLIENT_SECRET || '',
-    // }),
     // AppleProvider({
     //   clientId: process.env.APPLE_CLIENT_ID || '',
     //   clientSecret: process.env.APPLE_CLIENT_SECRET || '',
@@ -113,8 +110,35 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
   },
   debug: process.env.NODE_ENV === "development", // Detailed logs in dev
   events: {
-    async signIn({ user, account, profile }) {
-      console.log("[NextAuth] SignIn:", { provider: account?.provider, userId: user.id });
+    async signIn({ user, account }) {
+      if (account && user.id) {
+        console.log(`[NextAuth] Syncing ${account.provider} connection for user: ${user.id}`);
+        
+        // Encrypt tokens before saving
+        const encryptedAccessToken = account.access_token ? encrypt(account.access_token) : null;
+        const encryptedRefreshToken = account.refresh_token ? encrypt(account.refresh_token) : null;
+
+        await prisma.connection.upsert({
+          where: {
+            userId_provider: {
+              userId: user.id,
+              provider: account.provider,
+            },
+          },
+          update: {
+            accessToken: encryptedAccessToken,
+            refreshToken: encryptedRefreshToken,
+            expiresAt: account.expires_at ? new Date(account.expires_at * 1000) : null,
+          },
+          create: {
+            userId: user.id,
+            provider: account.provider,
+            accessToken: encryptedAccessToken,
+            refreshToken: encryptedRefreshToken,
+            expiresAt: account.expires_at ? new Date(account.expires_at * 1000) : null,
+          },
+        });
+      }
     },
     async signOut({ token }) {
       console.log("[NextAuth] SignOut:", { userId: token?.sub });
