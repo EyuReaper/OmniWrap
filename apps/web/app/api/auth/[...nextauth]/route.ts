@@ -1,41 +1,40 @@
 // apps/web/app/api/auth/[...nextauth]/route.ts
 import NextAuth from "next-auth";
+import {PrismaAdapter} from "@auth/prisma-adapter";
+import { PrismaClient } from "@prisma/client";
 import SpotifyProvider from "next-auth/providers/spotify";
 import GoogleProvider from "next-auth/providers/google";
-import GitHubProvider from "next-auth/providers/github";
+import GitHub from "next-auth/providers/github";
 import LinkedInProvider from "next-auth/providers/linkedin";
 import StravaProvider from "next-auth/providers/strava";
 import AppleProvider from "next-auth/providers/apple";
 
-// Custom provider example stub for Telegram (expand with real config)
-const TelegramProvider = (options) => {
-  return {
-    id: "telegram",
-    name: "Telegram",
-    type: "oauth",
-    clientId: process.env.TELEGRAM_CLIENT_ID,
-    clientSecret: process.env.TELEGRAM_CLIENT_SECRET,
-    authorization: { url: "https://oauth.telegram.org/authorize", params: { scope: "" } },
-    token: "https://oauth.telegram.org/token",
-    userinfo: "https://oauth.telegram.org/userinfo",
-    profile(profile) {
-      return {
-        id: profile.id,
-        name: profile.first_name + " " + profile.last_name,
-        email: profile.email,
-        image: profile.photo_url,
-      };
-    },
-    ...options,
-  };
-};
 
-// Custom stubs for Duolingo and Letterboxd (similar structure)
+// Custom provider stubs (uncomment when ready to implement)
+const TelegramProvider = (options) => ({
+  id: "telegram",
+  name: "Telegram",
+  type: "oauth",
+  clientId: process.env.TELEGRAM_CLIENT_ID,
+  clientSecret: process.env.TELEGRAM_CLIENT_SECRET,
+  authorization: { url: "https://oauth.telegram.org/authorize", params: { scope: "" } },
+  token: "https://oauth.telegram.org/token",
+  userinfo: "https://oauth.telegram.org/userinfo",
+  profile(profile) {
+    return {
+      id: profile.id.toString(),
+      name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || profile.username,
+      email: profile.email || null,
+      image: profile.photo_url || null,
+    };
+  },
+  ...options,
+});
+
 const DuolingoProvider = (options) => ({
   id: "duolingo",
   name: "Duolingo",
   type: "oauth",
-  // Fill in real endpoints from Duolingo docs (unofficial)
   clientId: process.env.DUOLINGO_CLIENT_ID,
   clientSecret: process.env.DUOLINGO_CLIENT_SECRET,
   authorization: "https://www.duolingo.com/oauth2/authorize",
@@ -48,7 +47,6 @@ const LetterboxdProvider = (options) => ({
   id: "letterboxd",
   name: "Letterboxd",
   type: "oauth",
-  // Letterboxd API is limited; use custom or manual export fallback
   clientId: process.env.LETTERBOXD_CLIENT_ID,
   clientSecret: process.env.LETTERBOXD_CLIENT_SECRET,
   authorization: "https://api.letterboxd.com/api/v0/auth/token",
@@ -56,73 +54,70 @@ const LetterboxdProvider = (options) => ({
   ...options,
 });
 
-export const authOptions = {
+const prisma = new PrismaClient();
+
+export const { auth, handlers, signIn, signOut } = NextAuth({
+  adapter: PrismaAdapter(prisma),
   providers: [
-    SpotifyProvider({
-      clientId: process.env.SPOTIFY_CLIENT_ID!,
-      clientSecret: process.env.SPOTIFY_CLIENT_SECRET!,
-      authorization: {
-        params: {
-          scope: "user-read-email user-top-read user-read-recently-played",
-        },
-      },
+    // SpotifyProvider({
+    //   clientId: process.env.SPOTIFY_CLIENT_ID || '',
+    //   clientSecret: process.env.SPOTIFY_CLIENT_SECRET || '',
+    //   authorization: {
+    //     params: {
+    //       scope: "user-read-email user-top-read user-read-recently-played",
+    //     },
+    //   },
+    // }),
+    // GoogleProvider({
+    //   clientId: process.env.GOOGLE_CLIENT_ID || '',
+    //   clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
+    //   authorization: {
+    //     params: {
+    //       scope: "https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile",
+    //     },
+    //   },
+    // }),
+    GitHub({
+      clientId: process.env.GITHUB_CLIENT_ID || '',
+      clientSecret: process.env.GITHUB_CLIENT_SECRET || '',
     }),
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-      authorization: {
-        params: {
-          scope: "https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile",
-        },
-      },
-    }),
-    GitHubProvider({
-      clientId: process.env.GITHUB_CLIENT_ID!,
-      clientSecret: process.env.GITHUB_CLIENT_SECRET!,
-    }),
-    LinkedInProvider({
-      clientId: process.env.LINKEDIN_CLIENT_ID!,
-      clientSecret: process.env.LINKEDIN_CLIENT_SECRET!,
-      authorization: { params: { scope: "r_liteprofile r_emailaddress" } },
-    }),
-    StravaProvider({
-      clientId: process.env.STRAVA_CLIENT_ID!,
-      clientSecret: process.env.STRAVA_CLIENT_SECRET!,
-    }),
-    AppleProvider({
-      clientId: process.env.APPLE_CLIENT_ID!,
-      clientSecret: process.env.APPLE_CLIENT_SECRET!,
-      // Apple Music requires additional MusicKit setup
-    }),
-    // Custom providers
-    TelegramProvider({}),
-    DuolingoProvider({}),
-    LetterboxdProvider({}),
+    // LinkedInProvider({
+    //   clientId: process.env.LINKEDIN_CLIENT_ID || '',
+    //   clientSecret: process.env.LINKEDIN_CLIENT_SECRET || '',
+    //   authorization: { params: { scope: "r_liteprofile r_emailaddress" } },
+    // }),
+    // StravaProvider({
+    //   clientId: process.env.STRAVA_CLIENT_ID || '',
+    //   clientSecret: process.env.STRAVA_CLIENT_SECRET || '',
+    // }),
+    // AppleProvider({
+    //   clientId: process.env.APPLE_CLIENT_ID || '',
+    //   clientSecret: process.env.APPLE_CLIENT_SECRET || '',
+    // }),
+    // Uncomment when ready (custom providers)
+    // TelegramProvider({}),
+    // DuolingoProvider({}),
+    // LetterboxdProvider({}),
   ],
   secret: process.env.NEXTAUTH_SECRET,
-  session: {
-    strategy: "jwt",
-  },
+  session: { strategy: "database" },
   callbacks: {
-    async jwt({ token, account }) {
-      if (account) {
-        token.connections = token.connections || [];
-        if (!token.connections.includes(account.provider)) {
-          token.connections.push(account.provider);
-        }
-      }
-      return token;
-    },
-    async session({ session, token }) {
-      session.user.connections = token.connections || [];
-      session.user.id = token.sub;
+    async session({ session, user }) {
+      session.user.id = user.id;
       return session;
     },
   },
   pages: {
     signIn: "/dashboard",
+    error: "/auth/error",  // Points to your custom error page
   },
-};
-
-const handler = NextAuth(authOptions);
-export { handler as GET, handler as POST };
+  debug: process.env.NODE_ENV === "development", // Detailed logs in dev
+  events: {
+    async signIn({ user, account, profile }) {
+      console.log("[NextAuth] SignIn:", { provider: account?.provider, userId: user.id });
+    },
+    async signOut({ token }) {
+      console.log("[NextAuth] SignOut:", { userId: token?.sub });
+    },
+  },
+});
