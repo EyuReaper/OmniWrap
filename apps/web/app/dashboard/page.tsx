@@ -1,11 +1,24 @@
 'use client';
 
 import { signIn, signOut, useSession } from 'next-auth/react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useState } from 'react';
 import Link from 'next/link';
 
 export default function Dashboard() {
   const { data: session } = useSession();
+  const [activeManualService, setActiveManualService] = useState<string | null>(null);
+  const [duoUsername, setDuoUsername] = useState('');
+
+  const handleConnect = (provider: string | null) => {
+    if (!provider) return;
+    
+    if (provider === 'telegram' || provider === 'duolingo') {
+      setActiveManualService(provider);
+    } else {
+      signIn(provider);
+    }
+  };
 
   const services = [
     {
@@ -212,7 +225,7 @@ export default function Dashboard() {
                 </p>
 
                 <button
-                  onClick={() => signIn(service.provider)}
+                  onClick={() => handleConnect(service.provider)}
                   className={`w-full py-3 px-5 bg-black/40 backdrop-blur-md border border-white/20 text-white font-semibold rounded-xl text-sm hover:bg-black/60 hover:border-[${service.accent}]/60 hover:text-[${service.accent}] transition-all duration-400 shadow-inner`}
                 >
                   Connect {service.name}
@@ -222,6 +235,72 @@ export default function Dashboard() {
           );
         })}
       </div>
+
+      {/* Manual Connection Modal */}
+      <AnimatePresence>
+        {activeManualService && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-md p-8 bg-gray-900 border border-white/10 rounded-3xl shadow-2xl"
+            >
+              <button
+                onClick={() => setActiveManualService(null)}
+                className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+
+              <div className="text-center">
+                <h2 className="text-3xl font-black text-white mb-4">
+                  Connect {activeManualService.charAt(0).toUpperCase() + activeManualService.slice(1)}
+                </h2>
+
+                {activeManualService === 'telegram' ? (
+                  <div className="space-y-6">
+                    <p className="text-gray-400 leading-relaxed">
+                      To sync your social stats, send your unique ID to our bot on Telegram.
+                    </p>
+                    <div className="p-4 bg-black/40 rounded-2xl border border-blue-500/30">
+                      <p className="text-xs text-blue-400 font-mono mb-2">TELEGRAM COMMAND</p>
+                      <code className="text-xl font-black text-white">/link {session?.user?.id?.slice(0, 8) || 'XXXXXX'}</code>
+                    </div>
+                    <Link
+                      href="https://t.me/OmniWrapBot"
+                      target="_blank"
+                      className="block w-full py-4 bg-[#0088CC] text-white font-bold rounded-2xl hover:bg-[#0077B5] transition-colors"
+                    >
+                      Open @OmniWrapBot
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    <p className="text-gray-400 leading-relaxed">
+                      Enter your Duolingo username to sync your learning streaks.
+                    </p>
+                    <input
+                      type="text"
+                      placeholder="@username"
+                      value={duoUsername}
+                      onChange={(e) => setDuoUsername(e.target.value)}
+                      className="w-full p-4 bg-black/40 border border-white/10 rounded-2xl text-white placeholder-gray-600 focus:outline-none focus:border-[#58CC02]/50"
+                    />
+                    <button
+                      className="w-full py-4 bg-[#58CC02] text-white font-bold rounded-2xl hover:bg-[#4CAF00] transition-colors"
+                    >
+                      Save Username
+                    </button>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* CTA */}
       <Link href="/wrap" className="relative z-20 mt-16 md:mt-20">

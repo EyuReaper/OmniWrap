@@ -86,11 +86,12 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
       clientId: process.env.STRAVA_CLIENT_ID || '',
       clientSecret: process.env.STRAVA_CLIENT_SECRET || '',
     }),
-    // LinkedInProvider({
+    LinkedInProvider({
+      clientId: process.env.LINKEDIN_CLIENT_ID || '',
+      clientSecret: process.env.LINKEDIN_CLIENT_SECRET || '',
+      authorization: { params: { scope: "openid profile email" } },
+    }),
     // AppleProvider({
-    //   clientId: process.env.APPLE_CLIENT_ID || '',
-    //   clientSecret: process.env.APPLE_CLIENT_SECRET || '',
-    // }),
     // Uncomment when ready (custom providers)
     // TelegramProvider({}),
     // DuolingoProvider({}),
