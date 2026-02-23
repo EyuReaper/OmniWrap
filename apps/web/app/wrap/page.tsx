@@ -9,28 +9,7 @@ import { Pagination, Autoplay, EffectFade } from 'swiper/modules';
 import Confetti from 'react-confetti';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import * as htmlToImage from 'html-to-image';
-
-// Mock data
-const mockData = {
-  spotify: { topSong: 'Blinding Lights', topArtist: 'The Weeknd', minutes: 14520, topGenre: 'Synthwave' },
-  youtube: { topVideo: 'MrBeast $1 vs $1,000,000 Hotel Room', watchHours: 680, topCategory: 'Entertainment' },
-  github: { commits: 1247, topRepo: 'omniwrap-core', languages: ['TypeScript', 'Rust', 'Go'] },
-  appleMusic: { topSong: 'Levitating', minutes: 9800 },
-  telegram: { messages: 4520, topChat: 'Dev Ops Team' },
-  duolingo: { streakDays: 312, xp: 24500, language: 'Spanish' },
-  linkedin: { connectionsAdded: 87, profileViews: 3200 },
-  letterboxd: { moviesWatched: 92, topGenre: 'Horror' },
-  strava: { distanceKm: 1450, activities: 210, topSport: 'Running' },
-  aggregated: { totalHours: 3200, topCategory: 'Productivity' },
-};
-
-const chartData = [
-  { name: 'Spotify', hours: mockData.spotify.minutes / 60 },
-  { name: 'YouTube', hours: mockData.youtube.watchHours },
-  { name: 'Apple Music', hours: mockData.appleMusic.minutes / 60 },
-  { name: 'Strava', hours: mockData.strava.distanceKm / 10 },
-  { name: 'GitHub', hours: mockData.github.commits / 20 },
-];
+import Link from 'next/link';
 
 const musicTracks = [
   { name: 'Neon Pulse', url: 'https://cdn.pixabay.com/download/audio/2022/11/10/audio_3c4d5e6f7g.mp3?filename=cyberpunk-2099-130007.mp3' },
@@ -74,6 +53,9 @@ const themes = {
 };
 
 export default function Wrap() {
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showConfetti, setShowConfetti] = useState(false);
   const [currentTrack, setCurrentTrack] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -83,8 +65,55 @@ export default function Wrap() {
   const shareCardRef = useRef<HTMLDivElement>(null);
   const theme = themes[currentTheme];
 
+  useEffect(() => {
+    async function fetchWrap() {
+      try {
+        const res = await fetch('/api/wrap');
+        if (!res.ok) throw new Error('Failed to fetch wrap');
+        const json = await res.json();
+        setData(json);
+      } catch (err) {
+        console.error('Wrap Fetch Error:', err);
+        setError('Could not load your 2025 Wrap. Make sure you are logged in and have connected at least one service!');
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchWrap();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-black flex flex-col items-center justify-center">
+        <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 2, ease: "linear" }} className="w-16 h-16 border-4 border-[#1DB954] border-t-transparent rounded-full mb-6" />
+        <p className="text-xl font-medium text-gray-400 animate-pulse">Aggregating your digital year...</p>
+      </div>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <div className="min-h-screen bg-black flex flex-col items-center justify-center p-8 text-center">
+        <h1 className="text-4xl font-black text-white mb-6">😕 Oops!</h1>
+        <p className="text-xl text-gray-400 mb-10 max-w-lg">{error}</p>
+        <Link href="/dashboard">
+          <button className="px-8 py-4 bg-[#1DB954] text-black font-bold rounded-xl hover:scale-105 transition-all">
+            Go to Dashboard
+          </button>
+        </Link>
+      </div>
+    );
+  }
+
+  const chartData = [
+    { name: 'Spotify', hours: (data.spotify?.minutes || 0) / 60 },
+    { name: 'YouTube', hours: data.google?.watchHours || 0 },
+    { name: 'Apple Music', hours: (data.appleMusic?.minutes || 0) / 60 },
+    { name: 'Strava', hours: (data.strava?.distanceKm || 0) / 10 },
+    { name: 'GitHub', hours: (data.github?.commits || 0) / 20 },
+  ].filter(d => d.hours > 0);
+
   const handleSlideChange = (swiper: any) => {
-    // Confetti on index 7 (Legend slide)
     if (swiper.activeIndex === 7) {
       setShowConfetti(true);
       setTimeout(() => setShowConfetti(false), 8000);
@@ -180,101 +209,111 @@ export default function Wrap() {
         </SwiperSlide>
 
         {/* Slide 2: Spotify */}
-        <SwiperSlide className="flex items-center justify-center">
-          <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className={`w-full max-w-4xl p-12 rounded-3xl border shadow-2xl mx-4 backdrop-blur-xl ${theme.card} ${theme.text}`}>
-            <h2 className={`text-5xl font-black mb-10 text-center ${theme.accent}`}>Music Vibes</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-12 text-center md:text-left">
-              <div>
-                <p className="text-xl uppercase tracking-widest opacity-60">Top Artist</p>
-                <p className="text-4xl font-black mt-2">{mockData.spotify.topArtist}</p>
-                <p className="text-xl mt-4 opacity-60">Top Track: {mockData.spotify.topSong}</p>
-              </div>
-              <div className="flex flex-col justify-center items-center md:items-end">
-                <p className="text-6xl font-black">{Math.round(mockData.spotify.minutes / 60)}</p>
-                <p className="text-xl uppercase tracking-widest opacity-60">Hours Listened</p>
-              </div>
-            </div>
-          </motion.div>
-        </SwiperSlide>
-
-        {/* Slide 3: YouTube */}
-        <SwiperSlide className="flex items-center justify-center">
-          <motion.div initial={{ opacity: 0, x: 100 }} animate={{ opacity: 1, x: 0 }} className={`w-full max-w-4xl p-12 rounded-3xl border shadow-2xl mx-4 backdrop-blur-xl ${theme.card} ${theme.text}`}>
-            <h2 className={`text-5xl font-black mb-10 text-center text-[#FF0000]`}>Watching Habits</h2>
-            <div className="text-center">
-              <p className="text-xl uppercase tracking-widest opacity-60">Most Watched</p>
-              <p className="text-3xl font-black mt-4 px-6 italic">"{mockData.youtube.topVideo}"</p>
-              <div className="mt-12 p-6 bg-white/5 rounded-2xl">
-                <p className="text-5xl font-black">{mockData.youtube.watchHours} hrs</p>
-                <p className="text-lg opacity-60">Spent on YouTube</p>
-              </div>
-            </div>
-          </motion.div>
-        </SwiperSlide>
-
-        {/* Slide 4: GitHub */}
-        <SwiperSlide className="flex items-center justify-center">
-          <motion.div initial={{ opacity: 0, rotateY: 90 }} animate={{ opacity: 1, rotateY: 0 }} className={`w-full max-w-4xl p-12 rounded-3xl border shadow-2xl mx-4 backdrop-blur-xl ${theme.card} ${theme.text}`}>
-            <h2 className={`text-5xl font-black mb-10 text-center text-[#6F42C1]`}>Code Journey</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <div className="bg-white/5 p-8 rounded-2xl text-center">
-                <p className="text-6xl font-black">{mockData.github.commits}</p>
-                <p className="text-xl opacity-60">Total Commits</p>
-              </div>
-              <div className="bg-white/5 p-8 rounded-2xl">
-                <p className="text-xl opacity-60 mb-4">Top Repository</p>
-                <p className="text-2xl font-bold truncate">{mockData.github.topRepo}</p>
-                <div className="flex gap-2 mt-6 flex-wrap">
-                  {mockData.github.languages.map(l => (
-                    <span key={l} className="px-3 py-1 bg-white/10 rounded-full text-xs font-bold">{l}</span>
-                  ))}
+        {data.spotify && (
+          <SwiperSlide className="flex items-center justify-center">
+            <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className={`w-full max-w-4xl p-12 rounded-3xl border shadow-2xl mx-4 backdrop-blur-xl ${theme.card} ${theme.text}`}>
+              <h2 className={`text-5xl font-black mb-10 text-center ${theme.accent}`}>Music Vibes</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-12 text-center md:text-left">
+                <div>
+                  <p className="text-xl uppercase tracking-widest opacity-60">Top Artist</p>
+                  <p className="text-4xl font-black mt-2">{data.spotify.topArtist}</p>
+                  <p className="text-xl mt-4 opacity-60">Top Track: {data.spotify.topSong}</p>
+                </div>
+                <div className="flex flex-col justify-center items-center md:items-end">
+                  <p className="text-6xl font-black">{Math.round(data.spotify.minutes / 60)}</p>
+                  <p className="text-xl uppercase tracking-widest opacity-60">Hours Listened</p>
                 </div>
               </div>
-            </div>
-          </motion.div>
-        </SwiperSlide>
+            </motion.div>
+          </SwiperSlide>
+        )}
+
+        {/* Slide 3: YouTube */}
+        {data.google && (
+          <SwiperSlide className="flex items-center justify-center">
+            <motion.div initial={{ opacity: 0, x: 100 }} animate={{ opacity: 1, x: 0 }} className={`w-full max-w-4xl p-12 rounded-3xl border shadow-2xl mx-4 backdrop-blur-xl ${theme.card} ${theme.text}`}>
+              <h2 className={`text-5xl font-black mb-10 text-center text-[#FF0000]`}>Watching Habits</h2>
+              <div className="text-center">
+                <p className="text-xl uppercase tracking-widest opacity-60">Most Watched</p>
+                <p className="text-3xl font-black mt-4 px-6 italic">"{data.google.topVideo}"</p>
+                <div className="mt-12 p-6 bg-white/5 rounded-2xl">
+                  <p className="text-5xl font-black">{data.google.watchHours} hrs</p>
+                  <p className="text-lg opacity-60">Spent on YouTube</p>
+                </div>
+              </div>
+            </motion.div>
+          </SwiperSlide>
+        )}
+
+        {/* Slide 4: GitHub */}
+        {data.github && (
+          <SwiperSlide className="flex items-center justify-center">
+            <motion.div initial={{ opacity: 0, rotateY: 90 }} animate={{ opacity: 1, rotateY: 0 }} className={`w-full max-w-4xl p-12 rounded-3xl border shadow-2xl mx-4 backdrop-blur-xl ${theme.card} ${theme.text}`}>
+              <h2 className={`text-5xl font-black mb-10 text-center text-[#6F42C1]`}>Code Journey</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="bg-white/5 p-8 rounded-2xl text-center">
+                  <p className="text-6xl font-black">{data.github.commits}</p>
+                  <p className="text-xl opacity-60">Total Commits</p>
+                </div>
+                <div className="bg-white/5 p-8 rounded-2xl">
+                  <p className="text-xl opacity-60 mb-4">Top Repository</p>
+                  <p className="text-2xl font-bold truncate">{data.github.topRepo}</p>
+                  <div className="flex gap-2 mt-6 flex-wrap">
+                    {data.github.languages?.map((l: string) => (
+                      <span key={l} className="px-3 py-1 bg-white/10 rounded-full text-xs font-bold">{l}</span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </SwiperSlide>
+        )}
 
         {/* Slide 5: Strava */}
-        <SwiperSlide className="flex items-center justify-center">
-          <motion.div initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }} className={`w-full max-w-4xl p-12 rounded-3xl border shadow-2xl mx-4 backdrop-blur-xl ${theme.card} ${theme.text}`}>
-            <h2 className={`text-5xl font-black mb-10 text-center text-[#FC4C02]`}>Active Lifestyle</h2>
-            <div className="flex flex-col items-center text-center">
-              <div className="w-32 h-32 rounded-full border-4 border-[#FC4C02] flex items-center justify-center mb-6">
-                <span className="text-4xl">🏃</span>
+        {data.strava && (
+          <SwiperSlide className="flex items-center justify-center">
+            <motion.div initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }} className={`w-full max-w-4xl p-12 rounded-3xl border shadow-2xl mx-4 backdrop-blur-xl ${theme.card} ${theme.text}`}>
+              <h2 className={`text-5xl font-black mb-10 text-center text-[#FC4C02]`}>Active Lifestyle</h2>
+              <div className="flex flex-col items-center text-center">
+                <div className="w-32 h-32 rounded-full border-4 border-[#FC4C02] flex items-center justify-center mb-6">
+                  <span className="text-4xl">🏃</span>
+                </div>
+                <p className="text-6xl font-black">{data.strava.distanceKm} km</p>
+                <p className="text-xl opacity-60 mt-2">Conquered in 2025</p>
+                <p className="text-2xl font-bold mt-8 text-white/80">{data.strava.activities} Sessions across the year</p>
               </div>
-              <p className="text-6xl font-black">{mockData.strava.distanceKm} km</p>
-              <p className="text-xl opacity-60 mt-2">Conquered in 2025</p>
-              <p className="text-2xl font-bold mt-8 text-white/80">{mockData.strava.activities} Sessions across the year</p>
-            </div>
-          </motion.div>
-        </SwiperSlide>
+            </motion.div>
+          </SwiperSlide>
+        )}
 
         {/* Slide 6: Duolingo */}
-        <SwiperSlide className="flex items-center justify-center">
-          <motion.div initial={{ opacity: 0, scale: 1.2 }} animate={{ opacity: 1, scale: 1 }} className={`w-full max-w-4xl p-12 rounded-3xl border shadow-2xl mx-4 backdrop-blur-xl ${theme.card} ${theme.text}`}>
-            <h2 className={`text-5xl font-black mb-10 text-center text-[#58CC02]`}>Daily Streak</h2>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="col-span-2 text-center py-10 bg-[#58CC02]/10 rounded-2xl border border-[#58CC02]/20">
-                <p className="text-8xl font-black text-[#58CC02]">{mockData.duolingo.streakDays}</p>
-                <p className="text-2xl font-bold">DAYS STREAK!</p>
+        {data.duolingo && (
+          <SwiperSlide className="flex items-center justify-center">
+            <motion.div initial={{ opacity: 0, scale: 1.2 }} animate={{ opacity: 1, scale: 1 }} className={`w-full max-w-4xl p-12 rounded-3xl border shadow-2xl mx-4 backdrop-blur-xl ${theme.card} ${theme.text}`}>
+              <h2 className={`text-5xl font-black mb-10 text-center text-[#58CC02]`}>Daily Streak</h2>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2 text-center py-10 bg-[#58CC02]/10 rounded-2xl border border-[#58CC02]/20">
+                  <p className="text-8xl font-black text-[#58CC02]">{data.duolingo.streakDays}</p>
+                  <p className="text-2xl font-bold">DAYS STREAK!</p>
+                </div>
+                <div className="text-center p-6 bg-white/5 rounded-2xl">
+                  <p className="text-3xl font-black">{data.duolingo.xp}</p>
+                  <p className="opacity-60">Total XP</p>
+                </div>
+                <div className="text-center p-6 bg-white/5 rounded-2xl">
+                  <p className="text-3xl font-black">{data.duolingo.language}</p>
+                  <p className="opacity-60">Language</p>
+                </div>
               </div>
-              <div className="text-center p-6 bg-white/5 rounded-2xl">
-                <p className="text-3xl font-black">{mockData.duolingo.xp}</p>
-                <p className="opacity-60">Total XP</p>
-              </div>
-              <div className="text-center p-6 bg-white/5 rounded-2xl">
-                <p className="text-3xl font-black">{mockData.duolingo.language}</p>
-                <p className="opacity-60">Language</p>
-              </div>
-            </div>
-          </motion.div>
-        </SwiperSlide>
+            </motion.div>
+          </SwiperSlide>
+        )}
 
         {/* Slide 7: The Legend (Aggregated) */}
         <SwiperSlide className="flex items-center justify-center">
           <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className={`w-full max-w-5xl p-12 rounded-3xl border shadow-2xl mx-4 backdrop-blur-xl ${theme.card} ${theme.text} text-center`}>
             <h2 className={`text-6xl font-black mb-6 bg-clip-text text-transparent bg-gradient-to-r from-green-400 via-purple-500 to-red-500`}>YOU ARE A LEGEND</h2>
-            <p className="text-3xl mb-12">Total Connected Time: <span className="font-black text-white">{mockData.aggregated.totalHours} Hours</span></p>
+            <p className="text-3xl mb-12">Total Connected Time: <span className="font-black text-white">{data.aggregated?.totalHours || 0} Hours</span></p>
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={chartData}>
                 <XAxis dataKey="name" hide />
@@ -303,10 +342,10 @@ export default function Wrap() {
                 <p className="opacity-70 text-lg italic">My Digital Legacy</p>
               </div>
               <div className="space-y-4">
-                 <div className="flex justify-between border-b border-white/10 pb-2"><span>Total Activity</span><span className="font-black">{mockData.aggregated.totalHours}h</span></div>
-                 <div className="flex justify-between border-b border-white/10 pb-2"><span>Code Commits</span><span className="font-black">{mockData.github.commits}</span></div>
-                 <div className="flex justify-between border-b border-white/10 pb-2"><span>Fitness</span><span className="font-black">{mockData.strava.distanceKm}km</span></div>
-                 <div className="flex justify-between border-b border-white/10 pb-2"><span>Top Track</span><span className="font-black truncate max-w-[100px]">{mockData.spotify.topSong}</span></div>
+                 <div className="flex justify-between border-b border-white/10 pb-2"><span>Total Activity</span><span className="font-black">{data.aggregated?.totalHours || 0}h</span></div>
+                 <div className="flex justify-between border-b border-white/10 pb-2"><span>Code Commits</span><span className="font-black">{data.github?.commits || 0}</span></div>
+                 <div className="flex justify-between border-b border-white/10 pb-2"><span>Fitness</span><span className="font-black">{data.strava?.distanceKm || 0}km</span></div>
+                 <div className="flex justify-between border-b border-white/10 pb-2"><span>Top Track</span><span className="font-black truncate max-w-[100px]">{data.spotify?.topSong || 'N/A'}</span></div>
               </div>
               <div className="text-center pt-4"><p className="text-xs opacity-50">GENERATE YOURS AT OMNIWRAP.COM</p></div>
             </div>

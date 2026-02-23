@@ -9,6 +9,7 @@ import LinkedInProvider from "next-auth/providers/linkedin";
 import StravaProvider from "next-auth/providers/strava";
 import AppleProvider from "next-auth/providers/apple";
 import { encrypt } from "@/lib/crypto";
+import { prisma } from "@/lib/prisma";
 
 
 // Custom provider stubs (uncomment when ready to implement)
@@ -54,8 +55,6 @@ const LetterboxdProvider = (options) => ({
   token: "https://api.letterboxd.com/api/v0/auth/token",
   ...options,
 });
-
-const prisma = new PrismaClient();
 
 export const { auth, handlers, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma),
