@@ -70,13 +70,13 @@ export class Aggregator {
       topCategory: this.calculateTopCategory(wrapData),
     };
 
-    // 4. Save the Wrap to the database
+    // 4. Save the Wrap to the database (Upsert based on userId and year)
     const savedWrap = await prisma.wrap.upsert({
       where: {
-        // Since id is UUID we usually don't have a unique for userId+year, 
-        // but let's find the latest or create. 
-        // For simplicity in MVP, we create a new one each time.
-        id: 'user-latest-placeholder' // This is just a conceptual placeholder
+        userId_year: {
+          userId: this.userId,
+          year: year,
+        }
       },
       update: {
         data: wrapData,
@@ -88,18 +88,7 @@ export class Aggregator {
       },
     });
 
-    // Note: upsert requires a unique. The schema only has id.
-    // Let's use create for now as a real "Wrap" generation is usually a one-time thing or versioned.
-    // Or we can add a unique constraint to the schema later.
-    const newWrap = await prisma.wrap.create({
-      data: {
-        userId: this.userId,
-        year: year,
-        data: wrapData,
-      },
-    });
-
-    return newWrap;
+    return savedWrap;
   }
 
   private calculateTopCategory(wrapData: any): string {
