@@ -348,9 +348,22 @@ export default function Wrap() {
               </div>
               <div className="text-center pt-4"><p className="text-xs opacity-50">GENERATE YOURS AT OMNIWRAP.COM</p></div>
             </div>
-            <button onClick={downloadShareCard} className={`px-10 py-4 text-xl font-black rounded-full shadow-xl transition-all hover:scale-105 ${currentTheme === 'minimal' ? 'bg-black text-white' : 'bg-white text-black'}`}>
-              Download Image
-            </button>
+            <div className="flex flex-col sm:flex-row gap-4 w-full justify-center">
+              <button onClick={downloadShareCard} className={`flex-1 max-w-xs px-10 py-4 text-xl font-black rounded-full shadow-xl transition-all hover:scale-105 ${currentTheme === 'minimal' ? 'bg-black text-white' : 'bg-white text-black'}`}>
+                Download Image
+              </button>
+              
+              <button 
+                onClick={() => {
+                  const text = `Check out my 2025 OmniWrap! I spent ${data.aggregated?.totalHours || 0} hours across my digital life. Generate yours at omniwrap.com 🔥 #OmniWrap2025`;
+                  window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`, '_blank');
+                }}
+                className="flex-1 max-w-xs px-10 py-4 text-xl font-black rounded-full bg-[#1DA1F2] text-white shadow-xl transition-all hover:scale-105 flex items-center justify-center gap-2"
+              >
+                <span>Share to X</span>
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.045 4.126H5.078z"/></svg>
+              </button>
+            </div>
           </motion.div>
         </SwiperSlide>
 

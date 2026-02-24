@@ -282,6 +282,11 @@ export default function Dashboard() {
                       className="w-full p-4 bg-black/40 border border-white/10 rounded-2xl text-white placeholder-gray-600 focus:outline-none focus:border-[#58CC02]/50"
                     />
                     <button
+                      onClick={() => {
+                        console.log('Saved Duolingo username:', duoUsername);
+                        setActiveManualService(null);
+                        alert('Duolingo connection saved (Local only for MVP)');
+                      }}
                       className="w-full py-4 bg-[#58CC02] text-white font-bold rounded-2xl hover:bg-[#4CAF00] transition-colors"
                     >
                       Save Username

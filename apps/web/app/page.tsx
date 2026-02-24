@@ -113,6 +113,28 @@ export default function Home() {
         </motion.div>
       </main>
 
+      {/* Supported Services Marquee/Grid */}
+      <section className="relative z-10 py-20 px-8">
+        <motion.div
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          transition={{ duration: 1 }}
+          className="container mx-auto"
+        >
+          <p className="text-center text-gray-500 uppercase tracking-[0.3em] text-sm font-bold mb-12">Supported Ecosystems</p>
+          <div className="flex flex-wrap justify-center items-center gap-12 md:gap-20 opacity-50 grayscale hover:opacity-100 hover:grayscale-0 transition-all duration-700">
+            <img src="https://cdn-icons-png.flaticon.com/512/174/174872.png" alt="Spotify" className="h-10 md:h-12" />
+            <img src="https://cdn-icons-png.flaticon.com/512/1384/1384060.png" alt="YouTube" className="h-10 md:h-12" />
+            <img src="https://cdn-icons-png.flaticon.com/512/25/25231.png" alt="GitHub" className="h-10 md:h-12 invert" />
+            <img src="https://upload.wikimedia.org/wikipedia/commons/c/cb/Strava_Logo.svg" alt="Strava" className="h-10 md:h-12" />
+            <img src="https://design.duolingo.com/0ae09c1b67d1113e0ac1.svg" alt="Duolingo" className="h-10 md:h-12" />
+            <img src="https://upload.wikimedia.org/wikipedia/commons/c/ca/LinkedIn_logo_initials.png" alt="LinkedIn" className="h-10 md:h-12" />
+            <img src="https://a.ltrbxd.com/logos/letterboxd-logo-v-neg-rgb.svg" alt="Letterboxd" className="h-10 md:h-12" />
+            <img src="https://upload.wikimedia.org/wikipedia/commons/8/82/Telegram_logo.svg" alt="Telegram" className="h-10 md:h-12" />
+          </div>
+        </motion.div>
+      </section>
+
       {/* Enhanced Footer */}
       <footer className="relative z-10 py-10 border-t border-white/10 bg-black/70 backdrop-blur-xl">
         <div className="container mx-auto px-8 text-center">
