@@ -1,7 +1,6 @@
 // apps/web/app/api/auth/[...nextauth]/route.ts
 import NextAuth from "next-auth";
 import {PrismaAdapter} from "@auth/prisma-adapter";
-import { PrismaClient } from "@prisma/client";
 import SpotifyProvider from "next-auth/providers/spotify";
 import GoogleProvider from "next-auth/providers/google";
 import GitHub from "next-auth/providers/github";
@@ -145,3 +144,5 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
     },
   },
 });
+
+export const { GET, POST } = handlers;

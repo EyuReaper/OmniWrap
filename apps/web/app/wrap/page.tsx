@@ -108,7 +108,6 @@ export default function Wrap() {
   const chartData = [
     { name: 'Spotify', hours: (data.spotify?.minutes || 0) / 60 },
     { name: 'YouTube', hours: data.google?.watchHours || 0 },
-    { name: 'Apple Music', hours: (data.appleMusic?.minutes || 0) / 60 },
     { name: 'Strava', hours: (data.strava?.distanceKm || 0) / 10 },
     { name: 'GitHub', hours: (data.github?.commits || 0) / 20 },
   ].filter(d => d.hours > 0);

@@ -46,14 +46,6 @@ export default function Dashboard() {
       accent: '#6F42C1',
     },
     {
-      name: 'Apple Music',
-      provider: 'apple',
-      color: 'from-[#FB5C5C]/30 to-[#FC7D7D]/10',
-      glow: 'shadow-[0_0_25px_#FB5C5C60]',
-      icon: 'https://cdn-icons-png.flaticon.com/512/179/179309.png',
-      accent: '#FB5C5C',
-    },
-    {
       name: 'Telegram',
       provider: 'telegram',
       color: 'from-[#0088CC]/30 to-[#229ED9]/10',
