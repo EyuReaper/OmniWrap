@@ -1,9 +1,10 @@
 import crypto from 'crypto';
+import { env } from "./env";
 
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 12; // Recommended for GCM
 const AUTH_TAG_LENGTH = 16;
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY; // Must be 32 chars (256 bits)
+const ENCRYPTION_KEY = env.ENCRYPTION_KEY; // Must be 32 chars (256 bits)
 
 /**
  * Encrypts a string using AES-256-GCM
@@ -34,7 +35,7 @@ export function decrypt(encryptedText: string): string {
   }
 
   const [ivHex, authTagHex, encrypted] = encryptedText.split(':');
-  
+
   if (!ivHex || !authTagHex || !encrypted) {
     throw new Error('Invalid encrypted text format');
   }
