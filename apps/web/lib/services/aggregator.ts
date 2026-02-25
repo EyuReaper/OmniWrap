@@ -1,8 +1,10 @@
+import { Prisma } from '@prisma/client';
 import { prisma } from '../prisma';
 import { SpotifyService } from './spotify';
 import { YouTubeService } from './youtube';
 import { GitHubService } from './github';
 import { StravaService } from './strava';
+import { WrapData } from '../types';
 
 export class Aggregator {
   private userId: string;
@@ -22,7 +24,7 @@ export class Aggregator {
     });
 
     const providers = connections.map((c) => c.provider);
-    const wrapData: any = {};
+    const wrapData: WrapData = {};
 
     // 2. Fetch data in parallel
     const promises = providers.map(async (provider) => {
@@ -48,7 +50,7 @@ export class Aggregator {
         }
 
         const data = await service.fetchData();
-        wrapData[provider] = data;
+        (wrapData as Record<string, unknown>)[provider] = data;
       } catch (err) {
         console.error(`[Aggregator] Failed to fetch data for ${provider}:`, err);
         // We continue with other services even if one fails
@@ -60,7 +62,7 @@ export class Aggregator {
     // 3. Simple aggregation for the "Legend" summary slide
     let totalMinutes = 0;
     if (wrapData.spotify?.minutes) totalMinutes += wrapData.spotify.minutes;
-    if (wrapData.youtube?.watchHours) totalMinutes += wrapData.youtube.watchHours * 60;
+    if (wrapData.google?.watchHours) totalMinutes += wrapData.google.watchHours * 60;
     // Commits and distance are harder to map to 'minutes' but we can add a proxy
     if (wrapData.github?.commits) totalMinutes += wrapData.github.commits * 10;
     if (wrapData.strava?.distanceKm) totalMinutes += wrapData.strava.distanceKm * 5;
@@ -79,22 +81,22 @@ export class Aggregator {
         }
       },
       update: {
-        data: wrapData,
+        data: wrapData as unknown as Prisma.InputJsonValue,
       },
       create: {
         userId: this.userId,
         year: year,
-        data: wrapData,
+        data: wrapData as unknown as Prisma.InputJsonValue,
       },
     });
 
     return savedWrap;
   }
 
-  private calculateTopCategory(wrapData: any): string {
+  private calculateTopCategory(wrapData: WrapData): string {
     const categories = {
         Music: wrapData.spotify?.minutes || 0,
-        Video: (wrapData.youtube?.watchHours || 0) * 60,
+        Video: (wrapData.google?.watchHours || 0) * 60,
         Code: (wrapData.github?.commits || 0) * 10,
         Fitness: (wrapData.strava?.distanceKm || 0) * 5,
     };

@@ -23,11 +23,18 @@ export class StravaService extends BaseService {
       const activities = await activitiesResponse.json();
 
       let totalDistance = 0;
-      let activityCounts: { [key: string]: number } = {};
+      const activityCounts: { [key: string]: number } = {};
 
-      activities.forEach((activity: any) => {
+      interface StravaActivity {
+        distance: number;
+        sport_type?: string;
+        type?: string;
+        total_elevation_gain?: number;
+      }
+
+      activities.forEach((activity: StravaActivity) => {
         totalDistance += activity.distance; // in meters
-        const type = activity.sport_type || activity.type;
+        const type = activity.sport_type || activity.type || 'Unknown';
         activityCounts[type] = (activityCounts[type] || 0) + 1;
       });
 
@@ -39,7 +46,7 @@ export class StravaService extends BaseService {
         distanceKm: Math.floor(totalDistance / 1000),
         activities: activities.length,
         topSport: topSport,
-        elevationGain: activities.reduce((acc: number, cur: any) => acc + (cur.total_elevation_gain || 0), 0),
+        elevationGain: activities.reduce((acc: number, cur: StravaActivity) => acc + (cur.total_elevation_gain || 0), 0),
       };
     } catch (error) {
       this.handleError(error);

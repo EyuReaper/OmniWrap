@@ -26,11 +26,11 @@ export class GitHubService extends BaseService {
       });
 
       let totalStars = 0;
-      let topRepo = repos[0]?.name || 'No Repos';
-      let languages = new Set<string>();
+      const topRepo = repos[0]?.name || 'No Repos';
+      const languages = new Set<string>();
 
-      repos.forEach((repo: any) => {
-        totalStars += repo.stargazers_count;
+      repos.forEach((repo: { stargazers_count?: number; language?: string | null }) => {
+        totalStars += repo.stargazers_count || 0;
         if (repo.language) languages.add(repo.language);
       });
 

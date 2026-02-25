@@ -35,12 +35,12 @@ export abstract class BaseService {
    * The main method to fetch and process data from the service
    * Must be implemented by each specific service
    */
-  abstract fetchData(): Promise<any>;
+  abstract fetchData(): Promise<unknown>;
 
   /**
    * Standard error handling for API calls
    */
-  protected handleError(error: any): never {
+  protected handleError(error: unknown): never {
     console.error(`Error in ${this.provider} service:`, error);
     throw new Error(`Failed to fetch data from ${this.provider}`);
   }

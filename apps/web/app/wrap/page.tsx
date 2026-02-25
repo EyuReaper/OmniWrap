@@ -10,6 +10,8 @@ import Confetti from 'react-confetti';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import * as htmlToImage from 'html-to-image';
 import Link from 'next/link';
+import { WrapData } from '@/lib/types';
+import { Swiper as SwiperType } from 'swiper';
 
 const musicTracks = [
   { name: 'Neon Pulse', url: 'https://cdn.pixabay.com/download/audio/2022/11/10/audio_3c4d5e6f7g.mp3?filename=cyberpunk-2099-130007.mp3' },
@@ -53,7 +55,7 @@ const themes = {
 };
 
 export default function Wrap() {
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<WrapData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showConfetti, setShowConfetti] = useState(false);
@@ -70,7 +72,7 @@ export default function Wrap() {
       try {
         const res = await fetch('/api/wrap');
         if (!res.ok) throw new Error('Failed to fetch wrap');
-        const json = await res.json();
+        const json = (await res.json()) as WrapData;
         setData(json);
       } catch (err) {
         console.error('Wrap Fetch Error:', err);
@@ -112,7 +114,7 @@ export default function Wrap() {
     { name: 'GitHub', hours: (data.github?.commits || 0) / 20 },
   ].filter(d => d.hours > 0);
 
-  const handleSlideChange = (swiper: any) => {
+  const handleSlideChange = (swiper: SwiperType) => {
     if (swiper.activeIndex === 7) {
       setShowConfetti(true);
       setTimeout(() => setShowConfetti(false), 8000);
@@ -234,7 +236,7 @@ export default function Wrap() {
               <h2 className={`text-5xl font-black mb-10 text-center text-[#FF0000]`}>Watching Habits</h2>
               <div className="text-center">
                 <p className="text-xl uppercase tracking-widest opacity-60">Most Watched</p>
-                <p className="text-3xl font-black mt-4 px-6 italic">"{data.google.topVideo}"</p>
+                <p className="text-3xl font-black mt-4 px-6 italic">&quot;{data.google.topVideo}&quot;</p>
                 <div className="mt-12 p-6 bg-white/5 rounded-2xl">
                   <p className="text-5xl font-black">{data.google.watchHours} hrs</p>
                   <p className="text-lg opacity-60">Spent on YouTube</p>
@@ -320,7 +322,7 @@ export default function Wrap() {
                 <Bar dataKey="hours" fill={theme.chart} radius={[10, 10, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
-            <p className="mt-10 text-xl opacity-60">You've mastered the digital realm in 2025.</p>
+            <p className="mt-10 text-xl opacity-60">You&apos;ve mastered the digital realm in 2025.</p>
           </motion.div>
         </SwiperSlide>
 

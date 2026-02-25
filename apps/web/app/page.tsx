@@ -18,9 +18,12 @@ export default function Home() {
       initialX: Math.random() * width,
       initialY: height + 10,
       animateX: Math.random() * width,
+      duration: Math.random() * 20 + 20,
     }));
 
-    setParticles(newParticles);
+    requestAnimationFrame(() => {
+      setParticles(newParticles);
+    });
   }, []);  // Empty array: run once on mount
 
   return (
@@ -38,7 +41,7 @@ export default function Home() {
                 x: p.animateX,
               }}
               transition={{
-                duration: Math.random() * 20 + 20,
+                duration: p.duration,
                 repeat: Infinity,
                 ease: "linear",
               }}
