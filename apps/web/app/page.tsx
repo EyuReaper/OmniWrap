@@ -146,7 +146,7 @@ export default function Home() {
           >
             © 2026 Made with 🔥 by
             <a
-              href="https://x.com/EyuReaper"
+              href="https://eyus-portfolio.vercel.app"
               target="_blank"
               rel="noopener noreferrer"
               className="font-bold text-white hover:text-[var(--spotify-green)] transition-all duration-300 hover:drop-shadow-glow"
