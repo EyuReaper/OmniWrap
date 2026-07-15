@@ -218,7 +218,8 @@ export default function Dashboard() {
 
                 <button
                   onClick={() => handleConnect(service.provider)}
-                  className={`w-full py-3 px-5 bg-black/40 backdrop-blur-md border border-white/20 text-white font-semibold rounded-xl text-sm hover:bg-black/60 hover:border-[${service.accent}]/60 hover:text-[${service.accent}] transition-all duration-400 shadow-inner`}
+                  style={{ '--accent': service.accent } as React.CSSProperties}
+                  className="w-full py-3 px-5 bg-black/40 backdrop-blur-md border border-white/20 text-white font-semibold rounded-xl text-sm hover:bg-black/60 hover:border-[var(--accent)]/60 hover:text-[var(--accent)] transition-all duration-400 shadow-inner"
                 >
                   Connect {service.name}
                 </button>

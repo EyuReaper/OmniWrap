@@ -10,7 +10,7 @@ As of December 24, 2025, the 2025 recap season is fully underway—most major se
 
 ## Project Folder Structure
 
-A recommended monorepo structure for building OmniWrap using Next.js (frontend + API routes):
+A recommended monorepo structure for building OmniWrap using Next.js (frontend + API routes), with optional separation for backend services:
 
 ```text
 omniwrap/
@@ -105,44 +105,9 @@ OmniWrap aligns with the year-end recap season for maximum data availability:
 
 ## Getting Started
 
-1. Visit omniwrap.com and sign up/login.
-2. Connect services via secure OAuth.
-3. Generate your unified wrap.
-4. Customize, view, and share.
-
-## Development Setup
-
-If you are a developer looking to contribute or run OmniWrap locally:
-
-### Prerequisites
-- Node.js 18+ (20+ recommended)
-- PostgreSQL database
-- Environment variables configured (see `.env.example`)
-
-### Installation
-
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/your-repo/omniwrap.git
-   cd omniwrap
-   ```
-
-2. **Install dependencies:**
-   ```bash
-   npm install
-   ```
-
-3. **Set up the database:**
-   ```bash
-   npx prisma generate
-   npx prisma db push
-   ```
-
-4. **Run the development server:**
-   ```bash
-   npm run dev
-   ```
-
-5. Open [http://localhost:3000](http://localhost:3000) in your browser.
+- Visit omniwrap.vercel.app and sign up/login.
+- Connect services via secure OAuth.
+- Generate your unified wrap.
+- Customize, view, and share.
 
 *Note: Basic features are free; premium tiers are available for advanced options like early access and deeper analytics.*

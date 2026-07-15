@@ -11,6 +11,14 @@ import { encrypt } from "@/lib/crypto";
 import { prisma } from "@/lib/prisma";
 import { env } from "@/lib/env";
 
+async function getUserConnections(userId: string): Promise<string[]> {
+  const connections = await prisma.connection.findMany({
+    where: { userId },
+    select: { provider: true },
+  });
+  return connections.map((c) => c.provider);
+}
+
 
 // Custom provider stubs (uncomment when ready to implement)
 const TelegramProvider = (options) => ({
@@ -92,6 +100,7 @@ const handler = NextAuth({
     async session({ session, user }) {
       if (session.user) {
         session.user.id = user.id;
+        session.user.connections = await getUserConnections(user.id);
       }
       return session;
     },

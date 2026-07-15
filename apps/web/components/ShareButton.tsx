@@ -1,11 +1,11 @@
-`use client`;
+'use client';
 
 import htmlToImage from 'html-to-image';
 import { useRef } from 'react';
 
-export default function ShareButton({ elementID }: { elementId: string }) {
+export default function ShareButton({ elementId }: { elementId: string }) {
     const handleShare = async () => {
-        const node = document.getElementById(elementID);
+        const node = document.getElementById(elementId);
         if (node) {
             const dataUrl = await htmlToImage.toPng(node);
             const link = document.createElement('a');
