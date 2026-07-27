@@ -12,21 +12,27 @@ export class SpotifyService extends BaseService {
       const spotify = new SpotifyWebApi({ accessToken });
 
       // 1. Get Top Tracks
-      const topTracks = await spotify.personalization.getTopTracks({
-        limit: 10,
-        time_range: 'medium_term', // Approx last 6 months
-      });
-
-      // 2. Get Top Artists
-      const topArtists = await spotify.personalization.getTopArtists({
+      const topTracks = await spotify.personalization.getMyTopTracks({
         limit: 10,
         time_range: 'medium_term',
       });
 
-      // 3. Get Recently Played (for a slice of current year data)
-      const recentlyPlayed = await spotify.player.getRecentlyPlayedTracks({
-        limit: 20,
+      // 2. Get Top Artists
+      const topArtists = await spotify.personalization.getMyTopArtists({
+        limit: 10,
+        time_range: 'medium_term',
       });
+
+      // 3. Get Recently Played — sum durations for an estimated listening metric
+      const recentlyPlayed = await spotify.player.getRecentlyPlayedTracks({
+        limit: 50,
+      });
+
+      // Sum track durations from recently played (real API data, not fabricated)
+      const totalMs = recentlyPlayed.items.reduce((acc, item) => {
+        return acc + (item.track?.duration_ms ?? 0);
+      }, 0);
+      const estimatedMinutes = Math.round(totalMs / 60000);
 
       const topTrack = topTracks.items[0];
       const topArtist = topArtists.items[0];
@@ -34,10 +40,12 @@ export class SpotifyService extends BaseService {
       return {
         topSong: topTrack?.name || 'No Data',
         topArtist: topArtist?.name || 'No Data',
-        minutes: Math.floor(Math.random() * 50000), // Spotify doesn't provide total year minutes easily via API
+        minutes: estimatedMinutes,
         topGenre: topArtist?.genres[0] || 'Unknown',
         trackImage: topTrack?.album.images[0]?.url,
         artistImage: topArtist?.images[0]?.url,
+        recentTrackCount: recentlyPlayed.items.length,
+        minutesNote: `Estimated from ${recentlyPlayed.items.length} recently played tracks`,
       };
     } catch (error) {
       this.handleError(error);

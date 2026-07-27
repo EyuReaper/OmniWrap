@@ -5,6 +5,8 @@ export interface SpotifyData {
   topGenre: string;
   trackImage?: string;
   artistImage?: string;
+  recentTrackCount?: number;
+  minutesNote?: string;
 }
 
 export interface YouTubeData {
@@ -15,6 +17,8 @@ export interface YouTubeData {
   subscriberCount?: string;
   viewCount?: string;
   recentSub?: string;
+  likedVideoCount?: number;
+  watchHoursNote?: string;
 }
 
 export interface GitHubData {
@@ -41,6 +45,14 @@ export interface AggregatedData {
   topCategory: string;
 }
 
+export type ProviderErrorKind = 'not_connected' | 'token_expired' | 'token_revoked' | 'fetch_error';
+
+export interface ProviderStatus {
+  ok: boolean;
+  error?: ProviderErrorKind;
+  message?: string;
+}
+
 export interface WrapData {
   spotify?: SpotifyData;
   google?: YouTubeData;
@@ -48,4 +60,5 @@ export interface WrapData {
   strava?: StravaData;
   duolingo?: DuolingoData;
   aggregated?: AggregatedData;
+  providerStatus?: Record<string, ProviderStatus>;
 }

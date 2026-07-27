@@ -223,6 +223,9 @@ export default function Wrap() {
                 <div className="flex flex-col justify-center items-center md:items-end">
                   <p className="text-6xl font-black">{Math.round(data.spotify.minutes / 60)}</p>
                   <p className="text-xl uppercase tracking-widest opacity-60">Hours Listened</p>
+                  {data.spotify.minutesNote && (
+                    <p className="text-sm opacity-40 mt-2 italic">{data.spotify.minutesNote}</p>
+                  )}
                 </div>
               </div>
             </motion.div>
@@ -240,6 +243,9 @@ export default function Wrap() {
                 <div className="mt-12 p-6 bg-white/5 rounded-2xl">
                   <p className="text-5xl font-black">{data.google.watchHours} hrs</p>
                   <p className="text-lg opacity-60">Spent on YouTube</p>
+                  {data.google.watchHoursNote && (
+                    <p className="text-sm opacity-40 mt-2 italic">{data.google.watchHoursNote}</p>
+                  )}
                 </div>
               </div>
             </motion.div>
@@ -309,6 +315,42 @@ export default function Wrap() {
             </motion.div>
           </SwiperSlide>
         )}
+
+        {/* Slide 6.5: Reconnect CTA for failed providers */}
+        {data.providerStatus && (() => {
+          const failed = Object.entries(data.providerStatus).filter(([, s]) => !s.ok);
+          if (failed.length === 0) return null;
+          const providerLabels: Record<string, string> = {
+            spotify: 'Spotify', google: 'YouTube', github: 'GitHub', strava: 'Strava',
+          };
+          const providerColors: Record<string, string> = {
+            spotify: '#1DB954', google: '#FF0000', github: '#6F42C1', strava: '#FC4C02',
+          };
+          return (
+            <SwiperSlide className="flex items-center justify-center">
+              <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className={`w-full max-w-4xl p-12 rounded-3xl border shadow-2xl mx-4 backdrop-blur-xl ${theme.card} ${theme.text}`}>
+                <h2 className="text-4xl font-black mb-8 text-center text-yellow-400">Some Services Need Attention</h2>
+                <p className="text-lg opacity-60 text-center mb-8">Reconnect to include their data in your wrap:</p>
+                <div className="flex flex-col gap-4">
+                  {failed.map(([provider, status]) => (
+                    <div key={provider} className="flex items-center justify-between p-4 bg-white/5 rounded-xl">
+                      <div className="flex items-center gap-3">
+                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: providerColors[provider] || '#888' }} />
+                        <span className="font-bold">{providerLabels[provider] || provider}</span>
+                        <span className="text-sm opacity-50">{status.message || status.error}</span>
+                      </div>
+                      <Link href="/dashboard">
+                        <button className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm font-bold transition-all">
+                          Reconnect
+                        </button>
+                      </Link>
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+            </SwiperSlide>
+          );
+        })()}
 
         {/* Slide 7: The Legend (Aggregated) */}
         <SwiperSlide className="flex items-center justify-center">
