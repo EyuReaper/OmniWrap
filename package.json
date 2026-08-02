@@ -9,7 +9,11 @@
   "scripts": {
     "dev": "cd apps/web && npm run dev",
     "build": "cd apps/web && npm run build",
-    "start": "cd apps/web && npm run start"
+    "start": "cd apps/web && npm run start",
+    "lint": "cd apps/web && npm run lint",
+    "typecheck": "cd apps/web && npm run typecheck",
+    "test": "cd apps/web && npm run test",
+    "test:e2e": "cd apps/web && npm run test:e2e"
   },
   "devDependencies": {
     "@prisma/config": "^7.2.0",

@@ -2,20 +2,44 @@
 
 import { signIn, signOut, useSession } from 'next-auth/react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import Footer from '@/components/Footer';
+import { Button } from '@/components/ui/Button';
+import { SkeletonServiceCard, SkeletonBlock } from '@/components/ui/Skeleton';
+import { useToast } from '@/components/ui/Toast';
+
+const oauthErrorMessages: Record<string, string> = {
+  OAuthSignin: 'Could not start sign-in with that provider. Please try again.',
+  OAuthCallback: 'The provider callback failed. Please try connecting again.',
+  OAuthAccountNotLinked: 'That account is already linked to a different sign-in method.',
+  AccessDenied: 'Access was denied by the provider.',
+};
 
 export default function Dashboard() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { showToast } = useToast();
   const [activeManualService, setActiveManualService] = useState<string | null>(null);
   const [duoUsername, setDuoUsername] = useState('');
 
-  const handleConnect = (provider: string | null) => {
+  useEffect(() => {
+    const error = searchParams.get('error');
+    if (error) {
+      showToast(oauthErrorMessages[error] || 'Something went wrong connecting that service.', 'error');
+      router.replace('/dashboard');
+    }
+  }, [searchParams, router, showToast]);
+
+  const handleConnect = (provider: string | null, label: string) => {
     if (!provider) return;
-    
+
     if (provider === 'telegram' || provider === 'duolingo') {
       setActiveManualService(provider);
     } else {
+      showToast(`Redirecting to ${label} sign-in…`, 'info');
       signIn(provider);
     }
   };
@@ -97,46 +121,57 @@ export default function Dashboard() {
   ];
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-black flex flex-col items-center justify-center p-6 md:p-10">
+    <div className="relative min-h-screen overflow-hidden bg-background text-foreground flex flex-col items-center p-6 md:p-10">
       {/* Subtle background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-black via-indigo-950/10 to-purple-950/5" />
+      <div className="absolute inset-0 bg-gradient-to-br from-transparent via-indigo-950/5 to-purple-950/5 dark:via-indigo-950/10 dark:to-purple-950/5" aria-hidden="true" />
 
-      {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -60 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }}
-        className="relative z-10 text-center mb-10 md:mb-16"
-      >
-        <h1 className="text-5xl md:text-6xl font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-b from-white via-gray-200 to-gray-400 drop-shadow-[0_0_20px_rgba(255,255,255,0.1)]">
-          {session ? `Hey ${session.user?.name?.split(' ')[0]}!` : 'OmniWrap'}
-        </h1>
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.4 }}
-          className="mt-3 text-base md:text-lg text-gray-400 font-light"
+      <div className="relative z-10 flex flex-col items-center flex-1 w-full">
+        {/* Header */}
+        <motion.div
+          initial={{ opacity: 0, y: -60 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }}
+          className="text-center mb-10 md:mb-16 mt-6 md:mt-10"
         >
-          Connect your 2025 digital world
-        </motion.p>
-      </motion.div>
+          {status === 'loading' ? (
+            <div className="flex flex-col items-center gap-4">
+              <SkeletonBlock className="h-12 md:h-16 w-64 md:w-96" />
+              <SkeletonBlock className="h-5 w-48" />
+            </div>
+          ) : (
+            <>
+              <h1 className="text-5xl md:text-6xl font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-b from-foreground to-foreground/60">
+                {session ? `Hey ${session.user?.name?.split(' ')[0]}!` : 'OmniWrap'}
+              </h1>
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.4 }}
+                className="mt-3 text-base md:text-lg text-text-muted font-light"
+              >
+                Connect your 2025 digital world
+              </motion.p>
+            </>
+          )}
+        </motion.div>
 
-      {/* Sign Out */}
-      {session && (
-        <motion.button
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          whileHover={{ scale: 1.05 }}
-          onClick={() => signOut()}
-          className="relative z-20 mb-10 md:mb-16 px-8 py-3 bg-gray-900/60 backdrop-blur-xl border border-red-500/30 text-red-300 rounded-full text-sm font-medium shadow-[0_0_20px_rgba(239,68,68,0.15)] hover:border-red-400 hover:text-white transition-all duration-300"
-        >
-          Sign Out
-        </motion.button>
-      )}
+        {/* Sign Out */}
+        {session && (
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => signOut()}
+            className="mb-10 md:mb-16 !rounded-full !border-danger/30 text-danger hover:!border-danger/60"
+          >
+            Sign Out
+          </Button>
+        )}
 
-      {/* Service Cards Grid */}
-      <div className="relative z-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 md:gap-8 w-full max-w-7xl">
-        {services.map((service, index) => {
+        {/* Service Cards Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 md:gap-8 w-full max-w-7xl">
+          {status === 'loading'
+            ? Array.from({ length: 8 }).map((_, i) => <SkeletonServiceCard key={i} />)
+            : services.map((service, index) => {
           if (service.isComingSoon) {
             return (
               <motion.div
@@ -152,7 +187,8 @@ export default function Dashboard() {
                   <div className="mb-5 relative">
                     <img
                       src={service.icon}
-                      alt="Coming Soon"
+                      alt=""
+                      aria-hidden="true"
                       className="w-14 h-14 md:w-16 md:h-16 drop-shadow-[0_0_12px_white] animate-pulse-slow"
                     />
                     <div className="absolute inset-0 bg-gradient-radial from-white/30 to-transparent rounded-full animate-pulse-slow opacity-50" />
@@ -194,7 +230,7 @@ export default function Dashboard() {
                 {session?.user?.connections?.includes(service.provider) && (
                   <div className="absolute top-4 right-4 flex items-center gap-1 px-3 py-1 bg-green-600/70 backdrop-blur-md border border-green-400/30 text-white text-xs font-bold rounded-full shadow-md">
                     <span>Connected</span>
-                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
                   </div>
@@ -217,7 +253,7 @@ export default function Dashboard() {
                 </p>
 
                 <button
-                  onClick={() => handleConnect(service.provider)}
+                  onClick={() => handleConnect(service.provider, service.name)}
                   style={{ '--accent': service.accent } as React.CSSProperties}
                   className="w-full py-3 px-5 bg-black/40 backdrop-blur-md border border-white/20 text-white font-semibold rounded-xl text-sm hover:bg-black/60 hover:border-[var(--accent)]/60 hover:text-[var(--accent)] transition-all duration-400 shadow-inner"
                 >
@@ -227,93 +263,108 @@ export default function Dashboard() {
             </motion.div>
           );
         })}
+        </div>
+
+        {/* Manual Connection Modal */}
+        <AnimatePresence>
+          {activeManualService && (
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="manual-connect-title"
+              className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm"
+            >
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                className="relative w-full max-w-md p-8 bg-gray-900 border border-white/10 rounded-3xl shadow-2xl"
+              >
+                <button
+                  onClick={() => setActiveManualService(null)}
+                  aria-label="Close dialog"
+                  className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors"
+                >
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+
+                <div className="text-center">
+                  <h2 id="manual-connect-title" className="text-3xl font-black text-white mb-4">
+                    Connect {activeManualService.charAt(0).toUpperCase() + activeManualService.slice(1)}
+                  </h2>
+
+                  {activeManualService === 'telegram' ? (
+                    <div className="space-y-6">
+                      <p className="text-gray-400 leading-relaxed">
+                        To sync your social stats, send your unique ID to our bot on Telegram.
+                      </p>
+                      <div className="p-4 bg-black/40 rounded-2xl border border-blue-500/30">
+                        <p className="text-xs text-blue-400 font-mono mb-2">TELEGRAM COMMAND</p>
+                        <code className="text-xl font-black text-white">/link {session?.user?.id?.slice(0, 8) || 'XXXXXX'}</code>
+                      </div>
+                      <Link
+                        href="https://t.me/OmniWrapBot"
+                        target="_blank"
+                        className="block w-full py-4 bg-[#0088CC] text-white font-bold rounded-2xl hover:bg-[#0077B5] transition-colors"
+                      >
+                        Open @OmniWrapBot
+                      </Link>
+                    </div>
+                  ) : (
+                    <div className="space-y-6">
+                      <p className="text-gray-400 leading-relaxed">
+                        Enter your Duolingo username to sync your learning streaks.
+                      </p>
+                      <label htmlFor="duolingo-username" className="sr-only">
+                        Duolingo username
+                      </label>
+                      <input
+                        id="duolingo-username"
+                        type="text"
+                        placeholder="@username"
+                        value={duoUsername}
+                        onChange={(e) => setDuoUsername(e.target.value)}
+                        className="w-full p-4 bg-black/40 border border-white/10 rounded-2xl text-white placeholder-gray-600 focus:outline-none focus:border-[#58CC02]/50"
+                      />
+                      <button
+                        onClick={() => {
+                          setActiveManualService(null);
+                          showToast('Duolingo connection saved (local only for MVP).', 'success');
+                        }}
+                        disabled={!duoUsername.trim()}
+                        className="w-full py-4 bg-[#58CC02] text-white font-bold rounded-2xl hover:bg-[#4CAF00] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Save Username
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* CTA */}
+        <Link href="/wrap" className="relative z-20 mt-16 md:mt-20">
+          <motion.button
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.9, duration: 1, ease: 'backOut' }}
+            whileHover={{ scale: 1.08 }}
+            whileTap={{ scale: 0.96 }}
+            className="relative px-12 py-5 text-xl md:text-2xl font-black text-white rounded-2xl overflow-hidden bg-gradient-to-r from-[#1DB954] via-[#9333EA] to-[#FF0000] shadow-[0_0_50px_rgba(29,185,84,0.4)] group"
+          >
+            <span className="relative z-10">Generate Your 2025 Wrap</span>
+            <div className="absolute inset-0 bg-gradient-to-r from-[#1DB954]/30 via-[#9333EA]/30 to-[#FF0000]/30 opacity-0 group-hover:opacity-100 transition-opacity duration-700 blur-xl" />
+          </motion.button>
+        </Link>
       </div>
 
-      {/* Manual Connection Modal */}
-      <AnimatePresence>
-        {activeManualService && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="relative w-full max-w-md p-8 bg-gray-900 border border-white/10 rounded-3xl shadow-2xl"
-            >
-              <button
-                onClick={() => setActiveManualService(null)}
-                className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors"
-              >
-                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-
-              <div className="text-center">
-                <h2 className="text-3xl font-black text-white mb-4">
-                  Connect {activeManualService.charAt(0).toUpperCase() + activeManualService.slice(1)}
-                </h2>
-
-                {activeManualService === 'telegram' ? (
-                  <div className="space-y-6">
-                    <p className="text-gray-400 leading-relaxed">
-                      To sync your social stats, send your unique ID to our bot on Telegram.
-                    </p>
-                    <div className="p-4 bg-black/40 rounded-2xl border border-blue-500/30">
-                      <p className="text-xs text-blue-400 font-mono mb-2">TELEGRAM COMMAND</p>
-                      <code className="text-xl font-black text-white">/link {session?.user?.id?.slice(0, 8) || 'XXXXXX'}</code>
-                    </div>
-                    <Link
-                      href="https://t.me/OmniWrapBot"
-                      target="_blank"
-                      className="block w-full py-4 bg-[#0088CC] text-white font-bold rounded-2xl hover:bg-[#0077B5] transition-colors"
-                    >
-                      Open @OmniWrapBot
-                    </Link>
-                  </div>
-                ) : (
-                  <div className="space-y-6">
-                    <p className="text-gray-400 leading-relaxed">
-                      Enter your Duolingo username to sync your learning streaks.
-                    </p>
-                    <input
-                      type="text"
-                      placeholder="@username"
-                      value={duoUsername}
-                      onChange={(e) => setDuoUsername(e.target.value)}
-                      className="w-full p-4 bg-black/40 border border-white/10 rounded-2xl text-white placeholder-gray-600 focus:outline-none focus:border-[#58CC02]/50"
-                    />
-                    <button
-                      onClick={() => {
-                        console.log('Saved Duolingo username:', duoUsername);
-                        setActiveManualService(null);
-                        alert('Duolingo connection saved (Local only for MVP)');
-                      }}
-                      className="w-full py-4 bg-[#58CC02] text-white font-bold rounded-2xl hover:bg-[#4CAF00] transition-colors"
-                    >
-                      Save Username
-                    </button>
-                  </div>
-                )}
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* CTA */}
-      <Link href="/wrap" className="relative z-20 mt-16 md:mt-20">
-        <motion.button
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.9, duration: 1, ease: 'backOut' }}
-          whileHover={{ scale: 1.08 }}
-          whileTap={{ scale: 0.96 }}
-          className="relative px-12 py-5 text-xl md:text-2xl font-black text-white rounded-2xl overflow-hidden bg-gradient-to-r from-[#1DB954] via-[#9333EA] to-[#FF0000] shadow-[0_0_50px_rgba(29,185,84,0.4)] group"
-        >
-          <span className="relative z-10">Generate Your 2025 Wrap</span>
-          <div className="absolute inset-0 bg-gradient-to-r from-[#1DB954]/30 via-[#9333EA]/30 to-[#FF0000]/30 opacity-0 group-hover:opacity-100 transition-opacity duration-700 blur-xl" />
-        </motion.button>
-      </Link>
+      <div className="relative z-10 w-full -mx-6 md:-mx-10 mt-16">
+        <Footer />
+      </div>
     </div>
   );
 }

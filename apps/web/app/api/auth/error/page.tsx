@@ -3,6 +3,7 @@
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
+import { Button } from '@/components/ui/Button';
 
 export default function AuthError() {
   const router = useRouter();
@@ -24,48 +25,39 @@ export default function AuthError() {
   const message = errorMessages[error as keyof typeof errorMessages] || errorMessages.default;
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-black p-6">
+    <div className="min-h-screen flex items-center justify-center bg-background text-foreground p-6">
       <motion.div
         initial={{ opacity: 0, y: 40 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8 }}
-        className="max-w-lg w-full text-center bg-gray-900/70 backdrop-blur-xl border border-red-500/30 rounded-3xl p-12 shadow-2xl"
+        className="max-w-lg w-full text-center bg-surface/80 backdrop-blur-xl border border-danger/30 rounded-3xl p-12 shadow-2xl"
       >
         <div className="mb-8">
-          <span className="text-8xl">😕</span>
+          <span className="text-8xl" role="img" aria-label="Confused face">😕</span>
         </div>
 
-        <h1 className="text-4xl md:text-5xl font-black text-white mb-6 tracking-tight">
+        <h1 className="text-4xl md:text-5xl font-black mb-6 tracking-tight">
           Oops! Authentication Error
         </h1>
 
-        <p className="text-xl text-gray-300 mb-10">
+        <p className="text-xl text-text-muted mb-10">
           {message}
         </p>
 
         <div className="space-y-4">
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={() => router.back()}
-            className="w-full py-4 px-8 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl transition-all"
-          >
+          <Button variant="danger" size="lg" onClick={() => router.back()} className="w-full !bg-danger/90 !text-white !border-transparent hover:!bg-danger">
             Go Back
-          </motion.button>
+          </Button>
 
-          <Link href="/dashboard">
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.98 }}
-              className="w-full py-4 px-8 bg-gray-800 hover:bg-gray-700 text-white font-bold rounded-xl border border-gray-600 transition-all"
-            >
+          <Link href="/dashboard" className="block">
+            <Button variant="secondary" size="lg" className="w-full">
               Return to Dashboard
-            </motion.button>
+            </Button>
           </Link>
         </div>
 
-        <p className="mt-10 text-sm text-gray-500">
-          If the problem persists, contact support or check your connection settings.
+        <p className="mt-10 text-sm text-text-subtle">
+          If the problem persists, <Link href="/support" className="underline hover:text-foreground">contact support</Link> or check your connection settings.
         </p>
       </motion.div>
     </div>

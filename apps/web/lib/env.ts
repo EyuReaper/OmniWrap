@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-const envSchema = z.object({
+export const envSchema = z.object({
   //infrastructure
   DATABASE_URL: z.string().url(),
   NEXTAUTH_SECRET: z.string().min(1),

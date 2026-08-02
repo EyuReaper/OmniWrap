@@ -4,7 +4,7 @@ import { env } from './env';
 const globalForPrisma = global as unknown as { prisma: PrismaClient };
 
 console.log('[Prisma] Initializing client...');
-export const prisma = globalForPrisma.prisma || new PrismaClient();
+export const prisma = globalForPrisma.prisma || new PrismaClient({ datasourceUrl: env.DATABASE_URL });
 console.log('[Prisma] Client ready.');
 
 if (env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;

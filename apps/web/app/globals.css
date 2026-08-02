@@ -1,26 +1,78 @@
 @import "tailwindcss";
 
+/*
+ * Design tokens. Light values live on :root, dark values override under
+ * prefers-color-scheme so every non-wrap page inherits theme awareness
+ * for free. The wrap experience opts out deliberately (it sets its own
+ * per-theme classes) since it's a themed slideshow, not app chrome.
+ */
 :root {
+  --background: #ffffff;
+  --foreground: #14141a;
+  --surface: #f4f4f6;
+  --surface-2: #e7e7eb;
+  --border: rgba(10, 10, 15, 0.12);
+  --text-muted: #4b4b57;
+  --text-subtle: #6b6b78;
+  --focus-ring: #1DB954;
+
   --spotify-green: #1DB954;
-  --youtube-red: #FF0000;
+  --youtube-red: #e00000;
   --github-purple: #6F42C1;
-  --bg-dark: #121212;
-  --text-light: #FFFFFF;
+  --strava-orange: #d94402;
+  --duolingo-green: #4ea600;
+  --telegram-blue: #0088CC;
+  --linkedin-blue: #0A66C2;
+  --danger: #b91c1c;
+  --success: #15803d;
+
+  --radius-card: 1rem;
+  --radius-pill: 9999px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0b;
+    --foreground: #f2f2f4;
+    --surface: #141417;
+    --surface-2: #1c1c21;
+    --border: rgba(255, 255, 255, 0.1);
+    --text-muted: #b4b4bd;
+    --text-subtle: #8b8b96;
+    --focus-ring: #4ade80;
+
+    --youtube-red: #ff3b3b;
+    --strava-orange: #ff7a3d;
+    --duolingo-green: #58CC02;
+    --danger: #f87171;
+    --success: #4ade80;
+  }
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --color-text-muted: var(--text-muted);
+  --color-text-subtle: var(--text-subtle);
+  --color-focus-ring: var(--focus-ring);
+
+  --color-spotify: var(--spotify-green);
+  --color-youtube: var(--youtube-red);
+  --color-github: var(--github-purple);
+  --color-strava: var(--strava-orange);
+  --color-duolingo: var(--duolingo-green);
+  --color-telegram: var(--telegram-blue);
+  --color-linkedin: var(--linkedin-blue);
+  --color-danger: var(--danger);
+  --color-success: var(--success);
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
 @keyframes pulse-slow {
   0%, 100% { opacity: 0.4; transform: scale(1); }
   50% { opacity: 0.8; transform: scale(1.2); }
@@ -29,6 +81,58 @@
   animation: pulse-slow 5s infinite ease-in-out;
 }
 
+@keyframes skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg, var(--surface) 25%, var(--surface-2) 50%, var(--surface) 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.6s ease-in-out infinite;
+}
+
 body {
-  @apply bg-[var(--bg-dark)] text-[var(--text-light)] font-sans;
+  background: var(--background);
+  color: var(--foreground);
+  @apply font-sans;
+}
+
+/* Respect the user's motion preference: kill non-essential animation and
+   let anything left be instant rather than jarring. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .animate-pulse-slow,
+  .skeleton {
+    animation: none !important;
+  }
+}
+
+/* Accessible keyboard focus. Only shows for keyboard/AT users thanks to
+   :focus-visible, so pointer clicks stay visually quiet. */
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.skip-link {
+  position: absolute;
+  left: 1rem;
+  top: -3rem;
+  z-index: 100;
+  background: var(--surface);
+  color: var(--foreground);
+  padding: 0.75rem 1.25rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--border);
+  font-weight: 600;
+  transition: top 0.2s ease;
+}
+.skip-link:focus {
+  top: 1rem;
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import 'swiper/css';
 import 'swiper/css/pagination';
@@ -12,6 +12,8 @@ import * as htmlToImage from 'html-to-image';
 import Link from 'next/link';
 import { WrapData } from '@/lib/types';
 import { Swiper as SwiperType } from 'swiper';
+import { SkeletonBlock, SkeletonText } from '@/components/ui/Skeleton';
+import { useToast } from '@/components/ui/Toast';
 
 const musicTracks = [
   { name: 'Neon Pulse', url: 'https://cdn.pixabay.com/download/audio/2022/11/10/audio_3c4d5e6f7g.mp3?filename=cyberpunk-2099-130007.mp3' },
@@ -62,10 +64,12 @@ export default function Wrap() {
   const [currentTrack, setCurrentTrack] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTheme, setCurrentTheme] = useState<keyof typeof themes>('default');
-  
+
   const audioRef = useRef<HTMLAudioElement>(null);
   const shareCardRef = useRef<HTMLDivElement>(null);
   const theme = themes[currentTheme];
+  const prefersReducedMotion = useReducedMotion();
+  const { showToast } = useToast();
 
   useEffect(() => {
     async function fetchWrap() {
@@ -86,9 +90,15 @@ export default function Wrap() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-black flex flex-col items-center justify-center">
-        <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 2, ease: "linear" }} className="w-16 h-16 border-4 border-[#1DB954] border-t-transparent rounded-full mb-6" />
-        <p className="text-xl font-medium text-gray-400 animate-pulse">Aggregating your digital year...</p>
+      <div className="min-h-screen bg-black flex flex-col items-center justify-center px-6">
+        <p className="text-xl font-medium text-gray-400 mb-10" aria-live="polite">
+          Aggregating your digital year...
+        </p>
+        <div className="w-full max-w-md p-8 rounded-3xl border border-white/10 bg-white/5">
+          <SkeletonBlock className="h-8 w-2/3 mb-6" />
+          <SkeletonText lines={3} />
+          <SkeletonBlock className="h-24 w-full mt-6" />
+        </div>
       </div>
     );
   }
@@ -115,7 +125,7 @@ export default function Wrap() {
   ].filter(d => d.hours > 0);
 
   const handleSlideChange = (swiper: SwiperType) => {
-    if (swiper.activeIndex === 7) {
+    if (swiper.activeIndex === 7 && !prefersReducedMotion) {
       setShowConfetti(true);
       setTimeout(() => setShowConfetti(false), 8000);
     }
@@ -126,7 +136,9 @@ export default function Wrap() {
       if (isPlaying) {
         audioRef.current.pause();
       } else {
-        audioRef.current.play().catch((e) => console.log('Playback error:', e));
+        audioRef.current.play().catch(() => {
+          showToast('Playback is unavailable right now.', 'error');
+        });
       }
       setIsPlaying(!isPlaying);
     }
@@ -150,19 +162,26 @@ export default function Wrap() {
         link.download = `omniwrap-2025-${currentTheme}.png`;
         link.href = dataUrl;
         link.click();
+        showToast('Share card downloaded!', 'success');
       } catch (err) {
         console.error('Could not generate image', err);
+        showToast('Could not generate the share card. Please try again.', 'error');
       }
     }
   };
 
   return (
     <div className={`relative min-h-screen overflow-hidden transition-colors duration-1000 ${theme.bg}`}>
-      {showConfetti && <Confetti numberOfPieces={400} recycle={false} gravity={0.1} />}
+      {showConfetti && !prefersReducedMotion && <Confetti numberOfPieces={400} recycle={false} gravity={0.1} />}
 
       {/* Floating Music Player */}
       <div className="fixed bottom-6 right-6 z-50 flex items-center gap-4 bg-black/70 backdrop-blur-2xl border border-white/10 rounded-full px-6 py-4 shadow-2xl">
-        <button onClick={togglePlay} className="text-2xl text-white hover:text-[#1DB954] transition-colors focus:outline-none">
+        <button
+          onClick={togglePlay}
+          aria-label={isPlaying ? 'Pause background music' : 'Play background music'}
+          aria-pressed={isPlaying}
+          className="text-2xl text-white hover:text-[#1DB954] transition-colors focus:outline-none"
+        >
           {isPlaying ? '⏸' : '▶️'}
         </button>
         <span className="text-sm font-medium text-gray-200 min-w-[140px] text-center truncate max-w-[150px]">
@@ -170,7 +189,13 @@ export default function Wrap() {
         </span>
         <div className="flex gap-3">
           {musicTracks.map((track, idx) => (
-            <button key={idx} onClick={() => changeTrack(idx)} className={`w-4 h-4 rounded-full transition-all duration-300 ${currentTrack === idx ? 'bg-[#1DB954] scale-125 shadow-[0_0_12px_#1DB954]' : 'bg-gray-600 hover:bg-gray-400'}`} />
+            <button
+              key={idx}
+              onClick={() => changeTrack(idx)}
+              aria-label={`Play track: ${track.name}`}
+              aria-current={currentTrack === idx}
+              className={`w-4 h-4 rounded-full transition-all duration-300 ${currentTrack === idx ? 'bg-[#1DB954] scale-125 shadow-[0_0_12px_#1DB954]' : 'bg-gray-600 hover:bg-gray-400'}`}
+            />
           ))}
         </div>
         <audio ref={audioRef} src={musicTracks[0].url} loop />
@@ -180,10 +205,10 @@ export default function Wrap() {
         direction="vertical"
         pagination={{ clickable: true, dynamicBullets: true }}
         modules={[Pagination, Autoplay, EffectFade]}
-        autoplay={{ delay: 8000, disableOnInteraction: true }}
+        autoplay={prefersReducedMotion ? false : { delay: 8000, disableOnInteraction: true }}
         effect="fade"
         fadeEffect={{ crossFade: true }}
-        speed={1200}
+        speed={prefersReducedMotion ? 0 : 1200}
         className="h-screen"
         onSlideChange={handleSlideChange}
       >
@@ -224,7 +249,7 @@ export default function Wrap() {
                   <p className="text-6xl font-black">{Math.round(data.spotify.minutes / 60)}</p>
                   <p className="text-xl uppercase tracking-widest opacity-60">Hours Listened</p>
                   {data.spotify.minutesNote && (
-                    <p className="text-sm opacity-40 mt-2 italic">{data.spotify.minutesNote}</p>
+                    <p className="text-sm opacity-70 mt-2 italic">{data.spotify.minutesNote}</p>
                   )}
                 </div>
               </div>
@@ -244,7 +269,7 @@ export default function Wrap() {
                   <p className="text-5xl font-black">{data.google.watchHours} hrs</p>
                   <p className="text-lg opacity-60">Spent on YouTube</p>
                   {data.google.watchHoursNote && (
-                    <p className="text-sm opacity-40 mt-2 italic">{data.google.watchHoursNote}</p>
+                    <p className="text-sm opacity-70 mt-2 italic">{data.google.watchHoursNote}</p>
                   )}
                 </div>
               </div>
@@ -337,7 +362,7 @@ export default function Wrap() {
                       <div className="flex items-center gap-3">
                         <div className="w-3 h-3 rounded-full" style={{ backgroundColor: providerColors[provider] || '#888' }} />
                         <span className="font-bold">{providerLabels[provider] || provider}</span>
-                        <span className="text-sm opacity-50">{status.message || status.error}</span>
+                        <span className="text-sm opacity-75">{status.message || status.error}</span>
                       </div>
                       <Link href="/dashboard">
                         <button className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm font-bold transition-all">
@@ -390,7 +415,7 @@ export default function Wrap() {
                  <div className="flex justify-between border-b border-white/10 pb-2"><span>Fitness</span><span className="font-black">{data.strava?.distanceKm || 0}km</span></div>
                  <div className="flex justify-between border-b border-white/10 pb-2"><span>Top Track</span><span className="font-black truncate max-w-[100px]">{data.spotify?.topSong || 'N/A'}</span></div>
               </div>
-              <div className="text-center pt-4"><p className="text-xs opacity-50">GENERATE YOURS AT OMNIWRAP.COM</p></div>
+              <div className="text-center pt-4"><p className="text-xs opacity-70">GENERATE YOURS AT OMNIWRAP.COM</p></div>
             </div>
             <div className="flex flex-col sm:flex-row gap-4 w-full justify-center">
               <button onClick={downloadShareCard} className={`flex-1 max-w-xs px-10 py-4 text-xl font-black rounded-full shadow-xl transition-all hover:scale-105 ${currentTheme === 'minimal' ? 'bg-black text-white' : 'bg-white text-black'}`}>
