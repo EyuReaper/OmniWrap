@@ -106,7 +106,7 @@ const handler = NextAuth({
     },
   },
   pages: {
-    signIn: "/dashboard",
+    signIn: "/signin",
     error: "/auth/error",
   },
   debug: env.NODE_ENV === "development",

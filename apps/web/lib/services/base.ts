@@ -89,6 +89,59 @@ async function refreshAccessToken(
   }
 }
 
+/**
+ * Fetches a valid (possibly refreshed) OAuth access token for a user+provider.
+ * Shared by BaseService (data fetching) and the connection-status endpoint
+ * (which needs the same refresh-or-fail semantics without fetching provider data).
+ * Throws a typed TokenError for missing/expired/revoked tokens instead of a bare Error.
+ */
+export async function getValidAccessToken(userId: string, provider: string): Promise<string> {
+  const connection = await prisma.connection.findUnique({
+    where: {
+      userId_provider: { userId, provider },
+    },
+  });
+
+  if (!connection || !connection.accessToken) {
+    throw new TokenError(provider, 'not_connected', 'No connection found');
+  }
+
+  const isExpired =
+    connection.expiresAt &&
+    connection.expiresAt.getTime() < Date.now() + TOKEN_REFRESH_BUFFER_MS;
+
+  if (!isExpired) {
+    return decrypt(connection.accessToken);
+  }
+
+  // Token is expired or about to expire — attempt refresh
+  if (!connection.refreshToken) {
+    throw new TokenError(provider, 'token_expired', 'Token expired and no refresh token available');
+  }
+
+  try {
+    const decryptedRefreshToken = decrypt(connection.refreshToken);
+    const refreshed = await refreshAccessToken(provider, decryptedRefreshToken);
+
+    // Persist the new tokens
+    await prisma.connection.update({
+      where: {
+        userId_provider: { userId, provider },
+      },
+      data: {
+        accessToken: encrypt(refreshed.accessToken),
+        ...(refreshed.refreshToken && { refreshToken: encrypt(refreshed.refreshToken) }),
+        ...(refreshed.expiresAt && { expiresAt: refreshed.expiresAt }),
+      },
+    });
+
+    return refreshed.accessToken;
+  } catch (err) {
+    console.error(`[BaseService] Token refresh failed for ${provider}:`, err);
+    throw new TokenError(provider, 'token_revoked', 'Token refresh failed');
+  }
+}
+
 export abstract class BaseService {
   protected userId: string;
   protected provider: string;
@@ -103,56 +156,7 @@ export abstract class BaseService {
    * Returns a typed error for expired/revoked tokens instead of throwing.
    */
   protected async getAccessToken(): Promise<string> {
-    const connection = await prisma.connection.findUnique({
-      where: {
-        userId_provider: {
-          userId: this.userId,
-          provider: this.provider,
-        },
-      },
-    });
-
-    if (!connection || !connection.accessToken) {
-      throw new TokenError(this.provider, 'not_connected', 'No connection found');
-    }
-
-    const isExpired =
-      connection.expiresAt &&
-      connection.expiresAt.getTime() < Date.now() + TOKEN_REFRESH_BUFFER_MS;
-
-    if (!isExpired) {
-      return decrypt(connection.accessToken);
-    }
-
-    // Token is expired or about to expire — attempt refresh
-    if (!connection.refreshToken) {
-      throw new TokenError(this.provider, 'token_expired', 'Token expired and no refresh token available');
-    }
-
-    try {
-      const decryptedRefreshToken = decrypt(connection.refreshToken);
-      const refreshed = await refreshAccessToken(this.provider, decryptedRefreshToken);
-
-      // Persist the new tokens
-      await prisma.connection.update({
-        where: {
-          userId_provider: {
-            userId: this.userId,
-            provider: this.provider,
-          },
-        },
-        data: {
-          accessToken: encrypt(refreshed.accessToken),
-          ...(refreshed.refreshToken && { refreshToken: encrypt(refreshed.refreshToken) }),
-          ...(refreshed.expiresAt && { expiresAt: refreshed.expiresAt }),
-        },
-      });
-
-      return refreshed.accessToken;
-    } catch (err) {
-      console.error(`[BaseService] Token refresh failed for ${this.provider}:`, err);
-      throw new TokenError(this.provider, 'token_expired', 'Token refresh failed');
-    }
+    return getValidAccessToken(this.userId, this.provider);
   }
 
   abstract fetchData(): Promise<unknown>;

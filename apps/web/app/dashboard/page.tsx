@@ -1,14 +1,17 @@
 'use client';
 
-import { signIn, signOut, useSession } from 'next-auth/react';
+import { signIn, useSession } from 'next-auth/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Footer from '@/components/Footer';
+import AccountMenu from '@/components/AccountMenu';
 import { Button } from '@/components/ui/Button';
 import { SkeletonServiceCard, SkeletonBlock } from '@/components/ui/Skeleton';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { useToast } from '@/components/ui/Toast';
+import { SERVICES, CONNECTABLE_SERVICES, ServiceDef, ConnectionInfo, ConnectionStatus } from '@/lib/serviceCatalog';
 
 const oauthErrorMessages: Record<string, string> = {
   OAuthSignin: 'Could not start sign-in with that provider. Please try again.',
@@ -17,13 +20,29 @@ const oauthErrorMessages: Record<string, string> = {
   AccessDenied: 'Access was denied by the provider.',
 };
 
+const statusBadge: Record<ConnectionStatus, { label: string; className: string } | null> = {
+  connected: { label: 'Connected', className: 'bg-green-600/70 border-green-400/30' },
+  pending: { label: 'Pending', className: 'bg-blue-600/70 border-blue-400/30' },
+  expired: { label: 'Expired', className: 'bg-amber-600/70 border-amber-400/30' },
+  error: { label: 'Error', className: 'bg-red-600/70 border-red-400/30' },
+  never: null,
+};
+
 export default function Dashboard() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
   const { showToast } = useToast();
+
+  const [connections, setConnections] = useState<Record<string, ConnectionInfo>>({});
+  const [connectionsLoading, setConnectionsLoading] = useState(true);
   const [activeManualService, setActiveManualService] = useState<string | null>(null);
   const [duoUsername, setDuoUsername] = useState('');
+  const [duoSubmitting, setDuoSubmitting] = useState(false);
+  const [duoError, setDuoError] = useState<string | null>(null);
+  const [disconnectTarget, setDisconnectTarget] = useState<ServiceDef | null>(null);
+  const [disconnecting, setDisconnecting] = useState(false);
+  const [isOffline, setIsOffline] = useState(() => typeof navigator !== 'undefined' && !navigator.onLine);
 
   useEffect(() => {
     const error = searchParams.get('error');
@@ -33,99 +52,222 @@ export default function Dashboard() {
     }
   }, [searchParams, router, showToast]);
 
-  const handleConnect = (provider: string | null, label: string) => {
-    if (!provider) return;
+  useEffect(() => {
+    const goOnline = () => setIsOffline(false);
+    const goOffline = () => {
+      setIsOffline(true);
+      showToast("You're offline. Some actions won't work until you reconnect.", 'error');
+    };
+    window.addEventListener('online', goOnline);
+    window.addEventListener('offline', goOffline);
+    return () => {
+      window.removeEventListener('online', goOnline);
+      window.removeEventListener('offline', goOffline);
+    };
+  }, [showToast]);
 
-    if (provider === 'telegram' || provider === 'duolingo') {
-      setActiveManualService(provider);
-    } else {
-      showToast(`Redirecting to ${label} sign-in…`, 'info');
-      signIn(provider);
+  const refreshConnections = async () => {
+    try {
+      const res = await fetch('/api/connections');
+      if (!res.ok) throw new Error();
+      const data = (await res.json()) as { connections: ConnectionInfo[] };
+      const map: Record<string, ConnectionInfo> = {};
+      for (const c of data.connections) map[c.provider] = c;
+      setConnections(map);
+      return map;
+    } catch {
+      showToast('Could not load your connection status.', 'error');
+      return null;
     }
   };
 
-  const services = [
-    {
-      name: 'Spotify',
-      provider: 'spotify',
-      color: 'from-[#1DB954]/30 to-[#1ED760]/10',
-      glow: 'shadow-[0_0_25px_#1DB95460]',
-      icon: 'https://cdn-icons-png.flaticon.com/512/174/174872.png',
-      accent: '#1DB954',
-    },
-    {
-      name: 'YouTube',
-      provider: 'google',
-      color: 'from-[#FF0000]/30 to-[#FF3333]/10',
-      glow: 'shadow-[0_0_25px_#FF000060]',
-      icon: 'https://cdn-icons-png.flaticon.com/512/1384/1384060.png',
-      accent: '#FF0000',
-    },
-    {
-      name: 'GitHub',
-      provider: 'github',
-      color: 'from-[#6F42C1]/30 to-[#7C3AED]/10',
-      glow: 'shadow-[0_0_25px_#6F42C180]',
-      icon: 'https://cdn-icons-png.flaticon.com/512/25/25231.png',
-      accent: '#6F42C1',
-    },
-    {
-      name: 'Telegram',
-      provider: 'telegram',
-      color: 'from-[#0088CC]/30 to-[#229ED9]/10',
-      glow: 'shadow-[0_0_25px_#0088CC60]',
-      icon: 'https://upload.wikimedia.org/wikipedia/commons/8/82/Telegram_logo.svg',
-      accent: '#0088CC',
-    },
-    {
-      name: 'Duolingo',
-      provider: 'duolingo',
-      color: 'from-[#58CC02]/30 to-[#7ACF00]/10',
-      glow: 'shadow-[0_0_25px_#58CC0260]',
-      icon: 'https://design.duolingo.com/0ae09c1b67d1113e0ac1.svg',
-      accent: '#58CC02',
-    },
-    {
-      name: 'LinkedIn',
-      provider: 'linkedin',
-      color: 'from-[#0A66C2]/30 to-[#0077B5]/10',
-      glow: 'shadow-[0_0_25px_#0A66C260]',
-      icon: 'https://upload.wikimedia.org/wikipedia/commons/c/ca/LinkedIn_logo_initials.png',
-      accent: '#0A66C2',
-    },
-    {
-      name: 'Letterboxd',
-      provider: 'letterboxd',
-      color: 'from-[#2C3440]/30 to-[#445566]/10',
-      glow: 'shadow-[0_0_25px_#00A0E960]',
-      icon: 'https://a.ltrbxd.com/logos/letterboxd-logo-v-neg-rgb.svg',
-      accent: '#00A0E9',
-    },
-    {
-      name: 'Strava',
-      provider: 'strava',
-      color: 'from-[#FC4C02]/30 to-[#FF6B3B]/10',
-      glow: 'shadow-[0_0_25px_#FC4C0260]',
-      icon: 'https://upload.wikimedia.org/wikipedia/commons/c/cb/Strava_Logo.svg',
-      accent: '#FC4C02',
-    },
-    {
-      name: 'Coming Soon',
-      provider: null,
-      color: 'from-gray-700/30 to-gray-800/10',
-      glow: 'shadow-[0_0_25px_rgba(255,255,255,0.1)]',
-      icon: 'https://cdn-icons-png.flaticon.com/512/1828/1828884.png',
-      accent: '#FFFFFF',
-      isComingSoon: true,
-    },
-  ];
+  useEffect(() => {
+    if (status !== 'authenticated') {
+      setConnectionsLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setConnectionsLoading(true);
+    refreshConnections().finally(() => {
+      if (!cancelled) setConnectionsLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status]);
+
+  // While the Telegram modal is open on a pending link, poll for the bot-side confirmation.
+  useEffect(() => {
+    if (activeManualService !== 'telegram' || connections.telegram?.status !== 'pending') return;
+    const interval = setInterval(async () => {
+      const map = await refreshConnections();
+      if (map?.telegram?.status === 'connected') {
+        setActiveManualService(null);
+        showToast('Telegram connected!', 'success');
+      }
+    }, 4000);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeManualService, connections.telegram?.status]);
+
+  const handleConnect = async (service: ServiceDef) => {
+    if (isOffline) {
+      showToast("You're offline. Reconnect and try again.", 'error');
+      return;
+    }
+
+    if (service.authType === 'manual') {
+      setActiveManualService(service.provider);
+      setDuoError(null);
+      if (service.provider === 'duolingo') {
+        setDuoUsername((connections.duolingo?.metadata?.username as string) || '');
+      }
+      if (service.provider === 'telegram' && connections.telegram?.status !== 'pending') {
+        try {
+          const res = await fetch('/api/connections/manual', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ provider: 'telegram' }),
+          });
+          if (!res.ok) throw new Error();
+          const data = await res.json();
+          setConnections((prev) => ({
+            ...prev,
+            telegram: { provider: 'telegram', status: 'pending', metadata: { linkCode: data.linkCode } },
+          }));
+        } catch {
+          showToast('Could not start Telegram linking. Please try again.', 'error');
+          setActiveManualService(null);
+        }
+      }
+      return;
+    }
+
+    showToast(`Redirecting to ${service.name} sign-in…`, 'info');
+    try {
+      await signIn(service.provider, { callbackUrl: '/dashboard' });
+    } catch {
+      showToast(`Could not connect ${service.name}. Please try again.`, 'error');
+    }
+  };
+
+  const handleDuolingoSubmit = async () => {
+    const trimmed = duoUsername.trim();
+    if (!trimmed) return;
+    if (isOffline) {
+      setDuoError("You're offline. Reconnect and try again.");
+      return;
+    }
+    setDuoSubmitting(true);
+    setDuoError(null);
+    try {
+      const res = await fetch('/api/connections/manual', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider: 'duolingo', username: trimmed }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setDuoError(data.error || 'Could not verify that username.');
+        return;
+      }
+      setConnections((prev) => ({
+        ...prev,
+        duolingo: { provider: 'duolingo', status: 'connected', metadata: data.metadata },
+      }));
+      setActiveManualService(null);
+      showToast('Duolingo connected!', 'success');
+    } catch {
+      setDuoError('Network error — check your connection and try again.');
+    } finally {
+      setDuoSubmitting(false);
+    }
+  };
+
+  const confirmDisconnect = async () => {
+    if (!disconnectTarget) return;
+    setDisconnecting(true);
+    try {
+      const res = await fetch(`/api/connections/${disconnectTarget.provider}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error();
+      setConnections((prev) => {
+        const next = { ...prev };
+        delete next[disconnectTarget.provider];
+        return next;
+      });
+      showToast(`Disconnected ${disconnectTarget.name}.`, 'success');
+    } catch {
+      showToast(
+        isOffline
+          ? `You're offline — couldn't disconnect ${disconnectTarget.name}.`
+          : `Could not disconnect ${disconnectTarget.name}. Please try again.`,
+        'error',
+      );
+    } finally {
+      setDisconnecting(false);
+      setDisconnectTarget(null);
+    }
+  };
+
+  const connectedCount = Object.values(connections).filter((c) => c.status === 'connected').length;
+  const totalCount = CONNECTABLE_SERVICES.length;
+  const isLoading = status === 'loading' || (status === 'authenticated' && connectionsLoading);
+
+  // Logged-out visitors get a distinct, minimal state — no service grid, just a way in.
+  if (status === 'unauthenticated') {
+    return (
+      <div className="relative min-h-screen overflow-hidden bg-background text-foreground flex flex-col items-center justify-center p-6 text-center">
+        <div
+          className="absolute inset-0 bg-gradient-to-br from-transparent via-indigo-950/5 to-purple-950/5 dark:via-indigo-950/10 dark:to-purple-950/5"
+          aria-hidden="true"
+        />
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.7 }}
+          className="relative z-10 max-w-md"
+        >
+          <h1 className="text-4xl md:text-5xl font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-b from-foreground to-foreground/60 mb-4">
+            OmniWrap
+          </h1>
+          <p className="text-base md:text-lg text-text-muted font-light mb-10">
+            Sign in to connect your services and build your year in review.
+          </p>
+          <Link href="/signin">
+            <Button size="lg" className="!rounded-full">
+              Sign in to get started
+            </Button>
+          </Link>
+        </motion.div>
+        <div className="relative z-10 w-full -mx-6 md:mx-0 mt-16">
+          <Footer />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-background text-foreground flex flex-col items-center p-6 md:p-10">
       {/* Subtle background */}
       <div className="absolute inset-0 bg-gradient-to-br from-transparent via-indigo-950/5 to-purple-950/5 dark:via-indigo-950/10 dark:to-purple-950/5" aria-hidden="true" />
 
+      {session && (
+        <div className="absolute top-6 right-6 md:top-8 md:right-8 z-30">
+          <AccountMenu />
+        </div>
+      )}
+
       <div className="relative z-10 flex flex-col items-center flex-1 w-full">
+        {isOffline && (
+          <div
+            role="status"
+            className="w-full max-w-7xl mb-6 rounded-xl border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger text-center"
+          >
+            You&apos;re offline — connecting or disconnecting services is unavailable until you&apos;re back online.
+          </div>
+        )}
+
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -60 }}
@@ -155,114 +297,144 @@ export default function Dashboard() {
           )}
         </motion.div>
 
-        {/* Sign Out */}
-        {session && (
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => signOut()}
-            className="mb-10 md:mb-16 !rounded-full !border-danger/30 text-danger hover:!border-danger/60"
-          >
-            Sign Out
-          </Button>
+        {/* Logged-in, zero-connections nudge */}
+        {!isLoading && connectedCount === 0 && (
+          <div className="w-full max-w-7xl mb-8 rounded-xl border border-border bg-surface-2/60 px-5 py-4 text-center text-sm text-text-muted">
+            Connect your first service below to start building your wrap.
+          </div>
         )}
 
         {/* Service Cards Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 md:gap-8 w-full max-w-7xl">
-          {status === 'loading'
+          {isLoading
             ? Array.from({ length: 8 }).map((_, i) => <SkeletonServiceCard key={i} />)
-            : services.map((service, index) => {
-          if (service.isComingSoon) {
-            return (
-              <motion.div
-                key={service.name}
-                initial={{ opacity: 0, y: 50, scale: 0.95 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                transition={{ duration: 0.9, delay: index * 0.08 + 0.3 }}
-                className={`group relative overflow-hidden rounded-2xl p-6 md:p-7 backdrop-blur-xl bg-gradient-to-br ${service.color} border border-white/10 ${service.glow} transition-all duration-500 opacity-80`}
-              >
-                <div className="absolute inset-0 bg-gradient-to-br from-transparent via-transparent to-black/30 opacity-50 transition-opacity duration-700" />
+            : SERVICES.map((service, index) => {
+                if (service.authType === 'comingSoon') {
+                  return (
+                    <motion.div
+                      key={service.provider}
+                      initial={{ opacity: 0, y: 50, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      transition={{ duration: 0.9, delay: index * 0.08 + 0.3 }}
+                      className={`group relative overflow-hidden rounded-2xl p-6 md:p-7 backdrop-blur-xl bg-gradient-to-br ${service.color} border border-white/10 ${service.glow} transition-all duration-500 opacity-80`}
+                    >
+                      <div className="absolute inset-0 bg-gradient-to-br from-transparent via-transparent to-black/30 opacity-50 transition-opacity duration-700" />
 
-                <div className="relative z-10 flex flex-col items-center text-center">
-                  <div className="mb-5 relative">
-                    <img
-                      src={service.icon}
-                      alt=""
-                      aria-hidden="true"
-                      className="w-14 h-14 md:w-16 md:h-16 drop-shadow-[0_0_12px_white] animate-pulse-slow"
-                    />
-                    <div className="absolute inset-0 bg-gradient-radial from-white/30 to-transparent rounded-full animate-pulse-slow opacity-50" />
-                  </div>
+                      <div className="absolute top-4 right-4 px-3 py-1 bg-black/50 backdrop-blur-md border border-white/20 text-gray-300 text-xs font-bold rounded-full">
+                        Coming soon
+                      </div>
 
-                  <h2 className="text-2xl md:text-3xl font-black text-white tracking-tight mb-3">
-                    {service.name}
-                  </h2>
+                      <div className="relative z-10 flex flex-col items-center text-center">
+                        <div className="mb-5 relative">
+                          <img
+                            src={service.icon}
+                            alt=""
+                            aria-hidden="true"
+                            className="w-14 h-14 md:w-16 md:h-16 drop-shadow-[0_0_12px_white] animate-pulse-slow"
+                          />
+                        </div>
 
-                  <p className="text-sm md:text-base text-gray-300 mb-6 opacity-90">
-                    More exciting services on the way...
-                  </p>
+                        <h2 className="text-2xl md:text-3xl font-black text-white tracking-tight mb-3">
+                          {service.name}
+                        </h2>
 
-                  <div className="w-full py-3 px-5 bg-black/40 backdrop-blur-md border border-white/20 text-gray-400 font-semibold rounded-xl text-sm cursor-not-allowed opacity-70">
-                    Unlocking Soon
-                  </div>
-                </div>
-              </motion.div>
-            );
-          }
+                        <p className="text-sm md:text-base text-gray-300 mb-6 opacity-90">
+                          More exciting services on the way...
+                        </p>
 
-          return (
-            <motion.div
-              key={service.name}
-              initial={{ opacity: 0, y: 50, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              transition={{
-                duration: 0.9,
-                delay: index * 0.08 + 0.3,
-                ease: [0.34, 1.56, 0.64, 1],
-              }}
-              whileHover={{ scale: 1.04, y: -6 }}
-              className={`group relative overflow-hidden rounded-2xl p-6 md:p-7 backdrop-blur-xl bg-gradient-to-br ${service.color} border border-white/10 ${service.glow} transition-all duration-500`}
-            >
-              <div className="absolute inset-0 bg-gradient-to-br from-transparent via-transparent to-black/30 opacity-50 group-hover:opacity-30 transition-opacity duration-700" />
+                        <div
+                          aria-disabled="true"
+                          className="w-full py-3 px-5 min-h-[44px] bg-black/40 backdrop-blur-md border border-white/20 text-gray-400 font-semibold rounded-xl text-sm cursor-not-allowed opacity-70"
+                        >
+                          Unlocking Soon
+                        </div>
+                      </div>
+                    </motion.div>
+                  );
+                }
 
-              <div className="relative z-10 flex flex-col items-center">
-                {/* Connected Badge */}
-                {session?.user?.connections?.includes(service.provider) && (
-                  <div className="absolute top-4 right-4 flex items-center gap-1 px-3 py-1 bg-green-600/70 backdrop-blur-md border border-green-400/30 text-white text-xs font-bold rounded-full shadow-md">
-                    <span>Connected</span>
-                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                )}
+                const info = connections[service.provider];
+                const connStatus: ConnectionStatus = info?.status ?? 'never';
+                const badge = statusBadge[connStatus];
+                const hasRow = connStatus !== 'never';
 
-                <div className="mb-5">
-                  <img
-                    src={service.icon}
-                    alt={`${service.name} icon`}
-                    className="w-14 h-14 md:w-16 md:h-16 drop-shadow-[0_0_12px_currentColor] transition-all duration-700 group-hover:scale-110 group-hover:rotate-6 group-hover:drop-shadow-[0_0_20px_currentColor] group-hover:brightness-125"
-                  />
-                </div>
+                const primaryLabel =
+                  connStatus === 'never'
+                    ? `Connect ${service.name}`
+                    : connStatus === 'pending'
+                      ? 'View link code'
+                      : connStatus === 'connected'
+                        ? service.authType === 'manual'
+                          ? 'Update'
+                          : 'Manage'
+                        : 'Reconnect';
 
-                <h2 className="text-2xl md:text-3xl font-black text-white tracking-tight mb-3 drop-shadow-md">
-                  {service.name}
-                </h2>
+                return (
+                  <motion.div
+                    key={service.provider}
+                    initial={{ opacity: 0, y: 50, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    transition={{
+                      duration: 0.9,
+                      delay: index * 0.08 + 0.3,
+                      ease: [0.34, 1.56, 0.64, 1],
+                    }}
+                    whileHover={{ scale: 1.04, y: -6 }}
+                    className={`group relative overflow-hidden rounded-2xl p-6 md:p-7 backdrop-blur-xl bg-gradient-to-br ${service.color} border border-white/10 ${service.glow} transition-all duration-500`}
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-br from-transparent via-transparent to-black/30 opacity-50 group-hover:opacity-30 transition-opacity duration-700" />
 
-                <p className="text-sm md:text-base text-gray-300 mb-6 opacity-90 font-light">
-                  Unlock your {service.name.toLowerCase()} highlights
-                </p>
+                    <div className="relative z-10 flex flex-col items-center">
+                      {badge && (
+                        <div
+                          className={`absolute top-4 right-4 flex items-center gap-1 px-3 py-1 backdrop-blur-md border text-white text-xs font-bold rounded-full shadow-md ${badge.className}`}
+                        >
+                          <span>{badge.label}</span>
+                        </div>
+                      )}
 
-                <button
-                  onClick={() => handleConnect(service.provider, service.name)}
-                  style={{ '--accent': service.accent } as React.CSSProperties}
-                  className="w-full py-3 px-5 bg-black/40 backdrop-blur-md border border-white/20 text-white font-semibold rounded-xl text-sm hover:bg-black/60 hover:border-[var(--accent)]/60 hover:text-[var(--accent)] transition-all duration-400 shadow-inner"
-                >
-                  Connect {service.name}
-                </button>
-              </div>
-            </motion.div>
-          );
-        })}
+                      <div className="mb-5">
+                        <img
+                          src={service.icon}
+                          alt={`${service.name} icon`}
+                          className="w-14 h-14 md:w-16 md:h-16 drop-shadow-[0_0_12px_currentColor] transition-all duration-700 group-hover:scale-110 group-hover:rotate-6 group-hover:drop-shadow-[0_0_20px_currentColor] group-hover:brightness-125"
+                        />
+                      </div>
+
+                      <h2 className="text-2xl md:text-3xl font-black text-white tracking-tight mb-3 drop-shadow-md">
+                        {service.name}
+                      </h2>
+
+                      <p className="text-sm md:text-base text-gray-300 mb-6 opacity-90 font-light">
+                        {connStatus === 'expired' || connStatus === 'error'
+                          ? (info?.lastError ?? 'Reconnect to keep this in your wrap.')
+                          : `Unlock your ${service.name.toLowerCase()} highlights`}
+                      </p>
+
+                      <div className="w-full flex flex-col gap-2">
+                        <button
+                          onClick={() => handleConnect(service)}
+                          disabled={isOffline}
+                          style={{ '--accent': service.accent } as React.CSSProperties}
+                          className="w-full min-h-[44px] py-3 px-5 bg-black/40 backdrop-blur-md border border-white/20 text-white font-semibold rounded-xl text-sm hover:bg-black/60 hover:border-[var(--accent)]/60 hover:text-[var(--accent)] transition-all duration-400 shadow-inner disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {primaryLabel}
+                        </button>
+
+                        {hasRow && (
+                          <button
+                            onClick={() => setDisconnectTarget(service)}
+                            disabled={isOffline}
+                            className="w-full min-h-[44px] py-2 px-5 text-gray-300 hover:text-danger text-xs font-semibold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            Disconnect
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </motion.div>
+                );
+              })}
         </div>
 
         {/* Manual Connection Modal */}
@@ -283,7 +455,7 @@ export default function Dashboard() {
                 <button
                   onClick={() => setActiveManualService(null)}
                   aria-label="Close dialog"
-                  className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors"
+                  className="absolute top-2 right-2 w-11 h-11 flex items-center justify-center text-gray-400 hover:text-white transition-colors"
                 >
                   <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -298,19 +470,24 @@ export default function Dashboard() {
                   {activeManualService === 'telegram' ? (
                     <div className="space-y-6">
                       <p className="text-gray-400 leading-relaxed">
-                        To sync your social stats, send your unique ID to our bot on Telegram.
+                        To sync your social stats, send your unique code to our bot on Telegram.
                       </p>
                       <div className="p-4 bg-black/40 rounded-2xl border border-blue-500/30">
                         <p className="text-xs text-blue-400 font-mono mb-2">TELEGRAM COMMAND</p>
-                        <code className="text-xl font-black text-white">/link {session?.user?.id?.slice(0, 8) || 'XXXXXX'}</code>
+                        <code className="text-xl font-black text-white">
+                          /link {(connections.telegram?.metadata?.linkCode as string) || '…'}
+                        </code>
                       </div>
                       <Link
                         href="https://t.me/OmniWrapBot"
                         target="_blank"
-                        className="block w-full py-4 bg-[#0088CC] text-white font-bold rounded-2xl hover:bg-[#0077B5] transition-colors"
+                        className="block w-full min-h-[44px] py-4 bg-[#0088CC] text-white font-bold rounded-2xl hover:bg-[#0077B5] transition-colors"
                       >
                         Open @OmniWrapBot
                       </Link>
+                      <p className="text-xs text-gray-500" role="status">
+                        Waiting for confirmation from Telegram…
+                      </p>
                     </div>
                   ) : (
                     <div className="space-y-6">
@@ -326,17 +503,21 @@ export default function Dashboard() {
                         placeholder="@username"
                         value={duoUsername}
                         onChange={(e) => setDuoUsername(e.target.value)}
-                        className="w-full p-4 bg-black/40 border border-white/10 rounded-2xl text-white placeholder-gray-600 focus:outline-none focus:border-[#58CC02]/50"
+                        aria-invalid={Boolean(duoError)}
+                        aria-describedby={duoError ? 'duolingo-error' : undefined}
+                        className="w-full p-4 min-h-[44px] bg-black/40 border border-white/10 rounded-2xl text-white placeholder-gray-600 focus:outline-none focus:border-[#58CC02]/50"
                       />
+                      {duoError && (
+                        <p id="duolingo-error" role="alert" className="text-sm text-danger -mt-3">
+                          {duoError}
+                        </p>
+                      )}
                       <button
-                        onClick={() => {
-                          setActiveManualService(null);
-                          showToast('Duolingo connection saved (local only for MVP).', 'success');
-                        }}
-                        disabled={!duoUsername.trim()}
-                        className="w-full py-4 bg-[#58CC02] text-white font-bold rounded-2xl hover:bg-[#4CAF00] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        onClick={handleDuolingoSubmit}
+                        disabled={!duoUsername.trim() || duoSubmitting || isOffline}
+                        className="w-full min-h-[44px] py-4 bg-[#58CC02] text-white font-bold rounded-2xl hover:bg-[#4CAF00] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        Save Username
+                        {duoSubmitting ? 'Verifying…' : 'Save Username'}
                       </button>
                     </div>
                   )}
@@ -346,20 +527,38 @@ export default function Dashboard() {
           )}
         </AnimatePresence>
 
-        {/* CTA */}
-        <Link href="/wrap" className="relative z-20 mt-16 md:mt-20">
-          <motion.button
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.9, duration: 1, ease: 'backOut' }}
-            whileHover={{ scale: 1.08 }}
-            whileTap={{ scale: 0.96 }}
-            className="relative px-12 py-5 text-xl md:text-2xl font-black text-white rounded-2xl overflow-hidden bg-gradient-to-r from-[#1DB954] via-[#9333EA] to-[#FF0000] shadow-[0_0_50px_rgba(29,185,84,0.4)] group"
-          >
-            <span className="relative z-10">Generate Your 2025 Wrap</span>
-            <div className="absolute inset-0 bg-gradient-to-r from-[#1DB954]/30 via-[#9333EA]/30 to-[#FF0000]/30 opacity-0 group-hover:opacity-100 transition-opacity duration-700 blur-xl" />
-          </motion.button>
-        </Link>
+        <ConfirmDialog
+          open={disconnectTarget !== null}
+          title={`Disconnect ${disconnectTarget?.name ?? ''}?`}
+          description={`This removes stored access to ${disconnectTarget?.name ?? 'this service'} and its data won't appear in future wraps until you reconnect.`}
+          confirmLabel="Disconnect"
+          variant="danger"
+          isBusy={disconnecting}
+          onConfirm={confirmDisconnect}
+          onCancel={() => setDisconnectTarget(null)}
+        />
+
+        {/* Progress + CTA */}
+        {!isLoading && (
+          <div className="mt-16 md:mt-20 flex flex-col items-center gap-4">
+            <p className="text-sm md:text-base text-text-muted font-medium">
+              {connectedCount} of {totalCount} services connected
+            </p>
+            <Link href="/wrap" className="relative z-20">
+              <motion.button
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.2, duration: 0.6, ease: 'backOut' }}
+                whileHover={{ scale: 1.08 }}
+                whileTap={{ scale: 0.96 }}
+                className="relative px-12 py-5 min-h-[44px] text-xl md:text-2xl font-black text-white rounded-2xl overflow-hidden bg-gradient-to-r from-[#1DB954] via-[#9333EA] to-[#FF0000] shadow-[0_0_50px_rgba(29,185,84,0.4)] group disabled:opacity-60"
+              >
+                <span className="relative z-10">Generate Your 2025 Wrap</span>
+                <div className="absolute inset-0 bg-gradient-to-r from-[#1DB954]/30 via-[#9333EA]/30 to-[#FF0000]/30 opacity-0 group-hover:opacity-100 transition-opacity duration-700 blur-xl" />
+              </motion.button>
+            </Link>
+          </div>
+        )}
       </div>
 
       <div className="relative z-10 w-full -mx-6 md:-mx-10 mt-16">

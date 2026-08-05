@@ -67,7 +67,7 @@ model Wrap {
   data      Json // Aggregated wrap data
   createdAt DateTime @default(now())
 
-  user User @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, year])
 }
@@ -80,6 +80,11 @@ model Connection {
   refreshToken String?   @db.Text //will be encrypted
   expiresAt    DateTime?
   metadata     Json? // stores things like spotify username, profile, pic
+  // Used by manual (non-OAuth) providers like duolingo/telegram, whose
+  // validity can't be derived from a token. OAuth providers derive live
+  // status (connected/expired/error) from accessToken/expiresAt instead.
+  status       String    @default("connected") // "connected" | "pending" | "error"
+  lastError    String?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 

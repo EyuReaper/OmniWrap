@@ -29,6 +29,7 @@ export const envSchema = z.object({
   //Future Stubs (Optional)
   TELEGRAM_CLIENT_ID: z.string().optional(),
   TELEGRAM_CLIENT_SECRET: z.string().optional(),
+  TELEGRAM_WEBHOOK_SECRET: z.string().optional(),
   DUOLINGO_CLIENT_ID: z.string().optional(),
   DUOLINGO_CLIENT_SECRET: z.string().optional(),
   LETTERBOXD_CLIENT_ID: z.string().optional(),
