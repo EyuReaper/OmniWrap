@@ -62,3 +62,15 @@ export interface WrapData {
   aggregated?: AggregatedData;
   providerStatus?: Record<string, ProviderStatus>;
 }
+
+/** Sanitized subset of WrapData safe to render on a public, unauthenticated share page. */
+export interface PublicWrapSnapshot {
+  year: number;
+  displayName: string | null;
+  totalHours: number;
+  topArtist?: string;
+  topSong?: string;
+  commits?: number;
+  distanceKm?: number;
+  streakDays?: number;
+}

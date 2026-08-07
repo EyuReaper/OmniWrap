@@ -65,6 +65,8 @@ model Wrap {
   userId    String
   year      Int
   data      Json // Aggregated wrap data
+  isPublic  Boolean  @default(false)
+  shareId   String?  @unique // set on first share; stable across public/private toggles
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)

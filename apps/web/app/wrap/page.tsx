@@ -56,6 +56,14 @@ const themes = {
   }
 };
 
+type ExportFormat = 'card' | 'square' | 'story';
+
+const exportFormats: Record<ExportFormat, { label: string; aspect: string; padding: string; width: number }> = {
+  card: { label: 'Card', aspect: 'aspect-[4/5]', padding: 'p-10', width: 1080 },
+  square: { label: 'Square', aspect: 'aspect-square', padding: 'p-8', width: 1080 },
+  story: { label: 'Story', aspect: 'aspect-[9/16]', padding: 'p-10', width: 1080 },
+};
+
 export default function Wrap() {
   const [data, setData] = useState<WrapData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -64,6 +72,11 @@ export default function Wrap() {
   const [currentTrack, setCurrentTrack] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTheme, setCurrentTheme] = useState<keyof typeof themes>('default');
+  const [exportFormat, setExportFormat] = useState<ExportFormat>('card');
+  const [includeWatermark, setIncludeWatermark] = useState(true);
+  const [isPublic, setIsPublic] = useState(false);
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [shareLoading, setShareLoading] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement>(null);
   const shareCardRef = useRef<HTMLDivElement>(null);
@@ -86,6 +99,21 @@ export default function Wrap() {
       }
     }
     fetchWrap();
+  }, []);
+
+  useEffect(() => {
+    async function fetchShareStatus() {
+      try {
+        const res = await fetch('/api/wrap/share');
+        if (!res.ok) return;
+        const json = await res.json();
+        setIsPublic(Boolean(json.isPublic));
+        setShareUrl(json.shareUrl ?? null);
+      } catch (err) {
+        console.error('Share status fetch error:', err);
+      }
+    }
+    fetchShareStatus();
   }, []);
 
   if (loading) {
@@ -157,9 +185,12 @@ export default function Wrap() {
   const downloadShareCard = async () => {
     if (shareCardRef.current) {
       try {
-        const dataUrl = await htmlToImage.toPng(shareCardRef.current);
+        const node = shareCardRef.current;
+        const renderedWidth = node.getBoundingClientRect().width;
+        const pixelRatio = renderedWidth > 0 ? exportFormats[exportFormat].width / renderedWidth : 2;
+        const dataUrl = await htmlToImage.toPng(node, { pixelRatio });
         const link = document.createElement('a');
-        link.download = `omniwrap-2025-${currentTheme}.png`;
+        link.download = `omniwrap-2025-${currentTheme}-${exportFormat}.png`;
         link.href = dataUrl;
         link.click();
         showToast('Share card downloaded!', 'success');
@@ -167,6 +198,38 @@ export default function Wrap() {
         console.error('Could not generate image', err);
         showToast('Could not generate the share card. Please try again.', 'error');
       }
+    }
+  };
+
+  const toggleShare = async (enabled: boolean) => {
+    setShareLoading(true);
+    try {
+      const res = await fetch('/api/wrap/share', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled }),
+      });
+      if (!res.ok) throw new Error('Failed to update sharing');
+      const json = await res.json();
+      setIsPublic(Boolean(json.isPublic));
+      setShareUrl(json.shareUrl ?? null);
+      showToast(enabled ? 'Your wrap snapshot is now public.' : 'Your wrap snapshot is now private.', 'success');
+    } catch (err) {
+      console.error('Share toggle error:', err);
+      showToast('Could not update sharing settings. Please try again.', 'error');
+    } finally {
+      setShareLoading(false);
+    }
+  };
+
+  const copyShareUrl = async () => {
+    if (!shareUrl) return;
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      showToast('Link copied to clipboard!', 'success');
+    } catch (err) {
+      console.error('Clipboard error:', err);
+      showToast('Could not copy the link.', 'error');
     }
   };
 
@@ -404,19 +467,68 @@ export default function Wrap() {
                 </button>
               ))}
             </div>
-            <div ref={shareCardRef} className={`relative w-full max-w-sm aspect-[4/5] p-10 rounded-3xl flex flex-col justify-between border-4 shadow-2xl ${theme.bg} ${theme.card} ${theme.text}`} style={{ borderColor: 'rgba(255,255,255,0.1)' }}>
+
+            <div className="flex flex-wrap items-center justify-center gap-4 bg-black/40 p-3 rounded-2xl backdrop-blur-md border border-white/10">
+              <div className="flex gap-2">
+                {(Object.keys(exportFormats) as ExportFormat[]).map((k) => (
+                  <button key={k} onClick={() => setExportFormat(k)} className={`px-4 py-2 rounded-full text-sm font-bold transition-all ${exportFormat === k ? 'bg-white text-black' : 'bg-white/10 text-white hover:bg-white/20'}`}>
+                    {exportFormats[k].label}
+                  </button>
+                ))}
+              </div>
+              <label className="flex items-center gap-2 text-sm font-medium text-white/80 cursor-pointer">
+                <input type="checkbox" checked={includeWatermark} onChange={(e) => setIncludeWatermark(e.target.checked)} className="w-4 h-4 accent-[#1DB954]" />
+                Watermark
+              </label>
+            </div>
+
+            <div ref={shareCardRef} className={`relative w-full max-w-sm ${exportFormats[exportFormat].aspect} ${exportFormats[exportFormat].padding} rounded-3xl flex flex-col border-4 shadow-2xl ${theme.bg} ${theme.card} ${theme.text} ${includeWatermark ? 'pb-14' : ''}`} style={{ borderColor: 'rgba(255,255,255,0.1)' }}>
               <div>
                 <h3 className={`text-4xl font-black mb-2 ${theme.accent}`}>OmniWrap 2025</h3>
                 <p className="opacity-70 text-lg italic">My Digital Legacy</p>
               </div>
-              <div className="space-y-4">
+              <div className="space-y-4 flex-1 flex flex-col justify-center">
                  <div className="flex justify-between border-b border-white/10 pb-2"><span>Total Activity</span><span className="font-black">{data.aggregated?.totalHours || 0}h</span></div>
                  <div className="flex justify-between border-b border-white/10 pb-2"><span>Code Commits</span><span className="font-black">{data.github?.commits || 0}</span></div>
                  <div className="flex justify-between border-b border-white/10 pb-2"><span>Fitness</span><span className="font-black">{data.strava?.distanceKm || 0}km</span></div>
                  <div className="flex justify-between border-b border-white/10 pb-2"><span>Top Track</span><span className="font-black truncate max-w-[100px]">{data.spotify?.topSong || 'N/A'}</span></div>
               </div>
-              <div className="text-center pt-4"><p className="text-xs opacity-70">GENERATE YOURS AT OMNIWRAP.COM</p></div>
+              {includeWatermark && (
+                <div className="absolute bottom-3 right-3 px-3 py-1 rounded-full bg-black/50 backdrop-blur-sm">
+                  <p className="text-[10px] font-bold tracking-wide opacity-80">OMNIWRAP.COM</p>
+                </div>
+              )}
             </div>
+
+            <div className="flex flex-col items-center gap-3 bg-black/40 p-5 rounded-2xl backdrop-blur-md border border-white/10 w-full max-w-md">
+              <label className="flex items-center gap-2 font-bold text-white/90 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isPublic}
+                  disabled={shareLoading}
+                  onChange={(e) => toggleShare(e.target.checked)}
+                  className="w-4 h-4 accent-[#1DB954]"
+                />
+                Make my wrap snapshot public
+              </label>
+              {isPublic && shareUrl && (
+                <div className="flex items-center gap-2 w-full">
+                  <input
+                    readOnly
+                    value={shareUrl}
+                    onFocus={(e) => e.target.select()}
+                    className="flex-1 min-w-0 px-3 py-2 rounded-lg bg-white/10 text-white text-sm truncate"
+                  />
+                  <button onClick={copyShareUrl} className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white text-sm font-bold transition-all">
+                    Copy
+                  </button>
+                </div>
+              )}
+              <p className="text-xs text-white/50 text-center">
+                Anyone with the link sees a limited snapshot (hours, top track, commits, distance, streak) — no account details.
+              </p>
+            </div>
+
             <div className="flex flex-col sm:flex-row gap-4 w-full justify-center">
               <button onClick={downloadShareCard} className={`flex-1 max-w-xs px-10 py-4 text-xl font-black rounded-full shadow-xl transition-all hover:scale-105 ${currentTheme === 'minimal' ? 'bg-black text-white' : 'bg-white text-black'}`}>
                 Download Image
