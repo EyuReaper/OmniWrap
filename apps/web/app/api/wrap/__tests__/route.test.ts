@@ -1,10 +1,11 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- test doubles for Prisma/NextAuth payloads */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock Prisma
 vi.mock('@/lib/prisma', () => ({
   prisma: {
     wrap: {
-      findFirst: vi.fn(),
+      findUnique: vi.fn(),
       upsert: vi.fn(),
     },
     connection: {
@@ -14,11 +15,11 @@ vi.mock('@/lib/prisma', () => ({
 }));
 
 // Mock auth from NextAuth
-vi.mock('@/app/api/auth/[...nextauth]/route', () => ({
+vi.mock('@/lib/auth', () => ({
   auth: vi.fn(),
 }));
 
-import { auth } from '@/app/api/auth/[...nextauth]/route';
+import { auth } from '@/lib/auth';
 import { GET, POST } from '../route';
 
 describe('/api/wrap Auth 401 Paths', () => {

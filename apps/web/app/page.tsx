@@ -1,8 +1,8 @@
-'use client';
-
-import { motion } from 'framer-motion';
+// Server Component: everything here is static marketing copy, so it renders to
+// HTML with no client bundle beyond the small <Reveal> entrance-animation island.
 import Link from 'next/link';
 import Footer from '@/components/Footer';
+import Reveal from '@/components/motion/Reveal';
 
 const steps = [
   {
@@ -85,30 +85,23 @@ export default function Home() {
 
       {/* Hero */}
       <main className="relative z-10 flex flex-col items-center justify-center px-4 sm:px-8 py-14 sm:py-20 text-center">
-        <motion.h1
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          className="text-4xl sm:text-5xl md:text-6xl font-black mb-5 bg-clip-text text-transparent bg-gradient-to-r from-[var(--spotify-green)] via-foreground via-50% to-[var(--youtube-red)]"
-        >
-          Your whole digital year, wrapped.
-        </motion.h1>
+        <Reveal variant="up">
+          <h1 className="text-4xl sm:text-5xl md:text-6xl font-black mb-5 bg-clip-text text-transparent bg-gradient-to-r from-[var(--spotify-green)] via-foreground via-50% to-[var(--youtube-red)]">
+            Your whole digital year, wrapped.
+          </h1>
+        </Reveal>
 
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.2 }}
-          className="text-lg sm:text-xl text-text-muted mb-10 max-w-2xl"
-        >
-          OmniWrap pulls together Spotify, YouTube, GitHub, and Strava into one shareable
-          year-in-review. No spreadsheets, no manual digging — just connect and see it come together.
-        </motion.p>
+        <Reveal variant="fade" delay={0.2}>
+          <p className="text-lg sm:text-xl text-text-muted mb-10 max-w-2xl">
+            OmniWrap pulls together Spotify, YouTube, GitHub, and Strava into one shareable
+            year-in-review. No spreadsheets, no manual digging — just connect and see it come together.
+          </p>
+        </Reveal>
 
         {/* CTA hierarchy: primary action vs. secondary/no-commitment action */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.35 }}
+        <Reveal
+          variant="scale"
+          delay={0.35}
           className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto max-w-sm sm:max-w-none mb-16 sm:mb-20"
         >
           <Link href="/dashboard">
@@ -121,7 +114,7 @@ export default function Home() {
               See a sample
             </button>
           </a>
-        </motion.div>
+        </Reveal>
 
         {/* How it works: 3 steps */}
         <div className="w-full max-w-4xl grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-4 mb-4">

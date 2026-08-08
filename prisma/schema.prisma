@@ -26,6 +26,9 @@ model Account {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
+  // Postgres does not index foreign keys automatically. NextAuth looks accounts
+  // up by userId on every link, and `User` cascade-deletes scan this column.
+  @@index([userId])
 }
 
 model Session {
@@ -34,6 +37,9 @@ model Session {
   userId       String
   expires      DateTime
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Same reason as Account.userId — plus session cleanup by user.
+  @@index([userId])
 }
 
 model User {
@@ -71,6 +77,9 @@ model Wrap {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  // Every read path is (userId, year) or shareId, both covered by unique
+  // indexes below. The userId prefix of this composite also serves
+  // "all wraps for a user" (year selector, account deletion cascade).
   @@unique([userId, year])
 }
 
@@ -92,5 +101,8 @@ model Connection {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  // Reads are either a single (userId, provider) lookup or "all connections
+  // for a user" — the userId prefix of this composite covers both, so no
+  // separate @@index([userId]) is needed.
   @@unique([userId, provider])
 }

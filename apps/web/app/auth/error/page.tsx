@@ -1,35 +1,35 @@
-'use client';
-
-import { useRouter, useSearchParams } from 'next/navigation';
-import { motion } from 'framer-motion';
+// Server Component: the error code comes from the query string, which the
+// server already has — no need to ship the whole page to read one param.
 import Link from 'next/link';
+import BackButton from '@/components/BackButton';
+import Reveal from '@/components/motion/Reveal';
 import { Button } from '@/components/ui/Button';
 
-export default function AuthError() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const error = searchParams.get('error');
+const errorMessages = {
+  Configuration: "There was a problem with the authentication configuration.",
+  AccessDenied: "You do not have permission to sign in.",
+  OAuthSignin: "Error signing in with the provider.",
+  OAuthCallback: "Callback error from the provider (check redirect URI).",
+  OAuthCreateAccount: "Could not create account with provider.",
+  EmailCreateAccount: "Could not create account with email.",
+  Callback: "Error during callback — try again.",
+  OAuthAccountNotLinked: "Account is not linked — sign in with the original provider.",
+  default: "An unexpected error occurred. Please try again.",
+};
 
-  const errorMessages = {
-    Configuration: "There was a problem with the authentication configuration.",
-    AccessDenied: "You do not have permission to sign in.",
-    OAuthSignin: "Error signing in with the provider.",
-    OAuthCallback: "Callback error from the provider (check redirect URI).",
-    OAuthCreateAccount: "Could not create account with provider.",
-    EmailCreateAccount: "Could not create account with email.",
-    Callback: "Error during callback — try again.",
-    OAuthAccountNotLinked: "Account is not linked — sign in with the original provider.",
-    default: "An unexpected error occurred. Please try again.",
-  };
-
+export default async function AuthError({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
+  const { error } = await searchParams;
   const message = errorMessages[error as keyof typeof errorMessages] || errorMessages.default;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background text-foreground p-6">
-      <motion.div
-        initial={{ opacity: 0, y: 40 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.8 }}
+      <Reveal
+        variant="up"
+        duration={0.8}
         className="max-w-lg w-full text-center bg-surface/80 backdrop-blur-xl border border-danger/30 rounded-3xl p-12 shadow-2xl"
       >
         <div className="mb-8">
@@ -45,9 +45,9 @@ export default function AuthError() {
         </p>
 
         <div className="space-y-4">
-          <Button variant="danger" size="lg" onClick={() => router.back()} className="w-full !bg-danger/90 !text-white !border-transparent hover:!bg-danger">
+          <BackButton className="w-full !bg-danger/90 !text-white !border-transparent hover:!bg-danger">
             Go Back
-          </Button>
+          </BackButton>
 
           <Link href="/dashboard" className="block">
             <Button variant="secondary" size="lg" className="w-full">
@@ -59,7 +59,7 @@ export default function AuthError() {
         <p className="mt-10 text-sm text-text-subtle">
           If the problem persists, <Link href="/support" className="underline hover:text-foreground">contact support</Link> or check your connection settings.
         </p>
-      </motion.div>
+      </Reveal>
     </div>
   );
 }

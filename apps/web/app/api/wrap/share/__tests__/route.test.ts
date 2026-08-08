@@ -10,11 +10,11 @@ vi.mock('@/lib/prisma', () => ({
   },
 }));
 
-vi.mock('@/app/api/auth/[...nextauth]/route', () => ({
+vi.mock('@/lib/auth', () => ({
   auth: vi.fn(),
 }));
 
-import { auth } from '@/app/api/auth/[...nextauth]/route';
+import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { GET, POST } from '../route';
 

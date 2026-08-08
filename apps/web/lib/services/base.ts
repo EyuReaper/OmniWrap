@@ -89,18 +89,37 @@ async function refreshAccessToken(
   }
 }
 
+/** The only Connection columns token resolution needs. */
+export interface ConnectionTokens {
+  accessToken: string | null;
+  refreshToken: string | null;
+  expiresAt: Date | null;
+}
+
 /**
  * Fetches a valid (possibly refreshed) OAuth access token for a user+provider.
  * Shared by BaseService (data fetching) and the connection-status endpoint
  * (which needs the same refresh-or-fail semantics without fetching provider data).
  * Throws a typed TokenError for missing/expired/revoked tokens instead of a bare Error.
+ *
+ * Pass `preloaded` when the caller already has the row (e.g. it listed every
+ * connection for the user) so status checks stay a single query instead of
+ * one per provider. Passing `null` explicitly means "known to be unconnected".
  */
-export async function getValidAccessToken(userId: string, provider: string): Promise<string> {
-  const connection = await prisma.connection.findUnique({
-    where: {
-      userId_provider: { userId, provider },
-    },
-  });
+export async function getValidAccessToken(
+  userId: string,
+  provider: string,
+  preloaded?: ConnectionTokens | null,
+): Promise<string> {
+  const connection =
+    preloaded !== undefined
+      ? preloaded
+      : await prisma.connection.findUnique({
+          where: {
+            userId_provider: { userId, provider },
+          },
+          select: { accessToken: true, refreshToken: true, expiresAt: true },
+        });
 
   if (!connection || !connection.accessToken) {
     throw new TokenError(provider, 'not_connected', 'No connection found');

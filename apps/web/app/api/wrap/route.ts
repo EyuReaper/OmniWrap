@@ -1,7 +1,9 @@
-import { auth } from "../auth/[...nextauth]/route";
+import { auth } from "@/lib/auth";
 import { Aggregator } from "@/lib/services/aggregator";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
+
+const YEAR = 2025;
 
 export async function GET() {
   const session = await auth();
@@ -11,15 +13,12 @@ export async function GET() {
   }
 
   try {
-    // 1. Check if a wrap for 2025 already exists to avoid heavy re-generation
-    const existingWrap = await prisma.wrap.findFirst({
-      where: {
-        userId: session.user.id,
-        year: 2025,
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
+    // 1. Check if a wrap for this year already exists to avoid heavy re-generation.
+    //    @@unique([userId, year]) guarantees at most one row, so this is a single
+    //    index lookup — no sort, and only the `data` column crosses the wire.
+    const existingWrap = await prisma.wrap.findUnique({
+      where: { userId_year: { userId: session.user.id, year: YEAR } },
+      select: { data: true },
     });
 
     if (existingWrap) {
@@ -30,7 +29,7 @@ export async function GET() {
     // 2. If not, generate it (Aggregator handles fetching from all connected services)
     console.log(`[API/Wrap] Generating new wrap for user: ${session.user.id}`);
     const aggregator = new Aggregator(session.user.id);
-    const newWrap = await aggregator.generateWrap(2025);
+    const newWrap = await aggregator.generateWrap(YEAR);
 
     return NextResponse.json(newWrap.data);
   } catch (error) {
@@ -51,7 +50,7 @@ export async function POST() {
 
   try {
     const aggregator = new Aggregator(session.user.id);
-    const newWrap = await aggregator.generateWrap(2025);
+    const newWrap = await aggregator.generateWrap(YEAR);
     return NextResponse.json(newWrap.data);
   } catch (error) {
     console.error("[API/Wrap] Refresh Error:", error);
