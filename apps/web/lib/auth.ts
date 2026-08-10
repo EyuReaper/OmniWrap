@@ -13,6 +13,7 @@ import StravaProvider from "next-auth/providers/strava";
 import { encrypt } from "@/lib/crypto";
 import { prisma } from "@/lib/prisma";
 import { env } from "@/lib/env";
+import { logAudit } from "@/lib/auditLog";
 
 /** Extra options merged into a provider stub by the caller. */
 type ProviderStubOptions = Record<string, unknown>;
@@ -147,6 +148,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             refreshToken: encryptedRefreshToken,
             expiresAt: account.expires_at ? new Date(account.expires_at * 1000) : null,
           },
+        });
+
+        await logAudit(user.id, "connection.connect", {
+          userEmail: user.email,
+          metadata: { provider: account.provider },
         });
       }
     },

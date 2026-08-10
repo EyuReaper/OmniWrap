@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { logAudit } from '@/lib/auditLog';
 
 export async function GET() {
   const session = await auth();
@@ -26,6 +27,10 @@ export async function DELETE() {
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+
+  // Logged before the delete: AuditLog.userId isn't a foreign key precisely
+  // so this record outlives the cascade delete below (see prisma/schema.prisma).
+  await logAudit(session.user.id, 'account.delete', { userEmail: session.user.email });
 
   await prisma.user.delete({ where: { id: session.user.id } });
 

@@ -83,6 +83,23 @@ model Wrap {
   @@unique([userId, year])
 }
 
+model AuditLog {
+  id        String   @id @default(cuid())
+  // Deliberately not a foreign key to User: an audit record for
+  // "account.delete" must survive the cascade delete of the user it
+  // describes, or the compliance trail disappears at exactly the moment it
+  // matters most. userEmail is a point-in-time snapshot for the same reason
+  // — it stays readable after the user row (and its email) is gone.
+  userId    String
+  userEmail String?
+  action    String // e.g. "connection.connect", "connection.disconnect", "account.delete"
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
 model Connection {
   id           String    @id @default(cuid())
   userId       String

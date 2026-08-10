@@ -3,6 +3,7 @@ import { randomBytes } from 'crypto';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { MANUAL_PROVIDERS } from '@/lib/serviceCatalog';
+import { logAudit } from '@/lib/auditLog';
 
 interface DuolingoUsersResponse {
   users?: { username: string; totalXp?: number }[];
@@ -84,6 +85,11 @@ export async function POST(req: Request) {
       where: { userId_provider: { userId, provider } },
       update: { status: 'connected', metadata: { username: trimmed }, lastError: null },
       create: { userId, provider, status: 'connected', metadata: { username: trimmed } },
+    });
+
+    await logAudit(userId, 'connection.connect', {
+      userEmail: session.user.email,
+      metadata: { provider, method: 'manual' },
     });
 
     return NextResponse.json({ ok: true, status: connection.status, metadata: connection.metadata });

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { CONNECTABLE_SERVICES } from '@/lib/serviceCatalog';
+import { logAudit } from '@/lib/auditLog';
 
 /** Disconnects a service: removes the stored tokens/metadata for the current user. */
 export async function DELETE(
@@ -30,6 +31,11 @@ export async function DELETE(
 
   await prisma.connection.delete({
     where: { userId_provider: { userId: session.user.id, provider } },
+  });
+
+  await logAudit(session.user.id, 'connection.disconnect', {
+    userEmail: session.user.email,
+    metadata: { provider },
   });
 
   return NextResponse.json({ ok: true, provider });
