@@ -16,7 +16,7 @@ const contentSecurityPolicy = [
   // are used throughout the UI — no nonce/hash plumbing for those yet.
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' https: data:",
-  "media-src 'self' https://cdn.pixabay.com",
+  "media-src 'self'",
   "font-src 'self' data:",
   "connect-src 'self'",
   // NextAuth's sign-in redirect posts to each OAuth provider's authorize URL.

@@ -1,6 +1,13 @@
-import { describe, it, expect, vi } from 'vitest';
+/* eslint-disable @typescript-eslint/no-explicit-any -- test doubles for Prisma/NextAuth payloads */
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// Mock Prisma client to prevent actual DB connections in unit tests
+// `vi.hoisted` so the vi.mock factories below (which are hoisted above this
+// module) can share the fetch spies with the assertions.
+const { fetchDataFns } = vi.hoisted(() => ({
+  fetchDataFns: {} as Record<string, ReturnType<typeof vi.fn>>,
+}));
+
+// Mock Prisma client to prevent actual DB connections in unit tests.
 vi.mock('@/lib/prisma', () => ({
   prisma: {
     connection: {
@@ -12,73 +19,154 @@ vi.mock('@/lib/prisma', () => ({
   },
 }));
 
+// Mock the four provider services so generateWrap can run without network.
+function mockServiceClass(provider: string, data: unknown) {
+  const fetchData = vi.fn().mockResolvedValue(data);
+  fetchDataFns[provider] = fetchData;
+  return class {
+    fetchData = fetchData;
+  };
+}
+
+vi.mock('../spotify', () => ({
+  SpotifyService: mockServiceClass('spotify', { topSong: 'S1', topArtist: 'A1', minutes: 6000, topGenre: 'pop', recentTrackCount: 50 }),
+}));
+vi.mock('../youtube', () => ({
+  YouTubeService: mockServiceClass('google', { channelName: 'C', topVideo: 'V1', watchHours: 20, topCategory: 'Music', likedVideoCount: 40 }),
+}));
+vi.mock('../github', () => ({
+  GitHubService: mockServiceClass('github', { username: 'u', commits: 1500, topRepo: 'r', languages: ['ts'], totalStars: 10 }),
+}));
+vi.mock('../strava', () => ({
+  StravaService: mockServiceClass('strava', { distanceKm: 1000, activities: 200, topSport: 'Run', elevationGain: 50 }),
+}));
+
+import { prisma } from '../../prisma';
 import { Aggregator } from '../aggregator';
 import { WrapData } from '../../types';
 
-describe('Aggregator - calculateTopCategory Logic', () => {
+describe('Aggregator - calculateTopCategory (honest, time-based only)', () => {
   const aggregator = new Aggregator('test-user-id');
 
-  /** Score-only fixtures; cast because calculateTopCategory only reads numeric fields. */
-  const scoreOnly = (data: {
-    spotify?: { minutes: number };
-    google?: { watchHours: number };
-    github?: { commits: number };
-    strava?: { distanceKm: number };
-  }) => data as WrapData;
-
-  it('should identify "Music" as top category when Spotify minutes yield the highest score', () => {
-    const wrapData = scoreOnly({
-      spotify: { minutes: 6000 }, // score = 6000
-      google: { watchHours: 20 },  // score = 20 * 60 = 1200
-      github: { commits: 100 },    // score = 100 * 10 = 1000
-      strava: { distanceKm: 50 },  // score = 50 * 5 = 250
-    });
-
-    const topCategory = aggregator.calculateTopCategory(wrapData);
-    expect(topCategory).toBe('Music');
+  it('returns "Music" when Spotify minutes exceed YouTube watch hours', () => {
+    const wrapData = {
+      spotify: { minutes: 6000 },
+      google: { watchHours: 20 }, // 1200 min
+    } as WrapData;
+    expect(aggregator.calculateTopCategory(wrapData)).toBe('Music');
   });
 
-  it('should identify "Video" as top category when YouTube watch hours yield the highest score', () => {
-    const wrapData = scoreOnly({
-      spotify: { minutes: 500 },  // score = 500
-      google: { watchHours: 150 }, // score = 150 * 60 = 9000
-      github: { commits: 200 },    // score = 200 * 10 = 2000
-      strava: { distanceKm: 100 }, // score = 100 * 5 = 500
-    });
-
-    const topCategory = aggregator.calculateTopCategory(wrapData);
-    expect(topCategory).toBe('Video');
+  it('returns "Video" when YouTube watch hours exceed Spotify minutes', () => {
+    const wrapData = {
+      spotify: { minutes: 500 },
+      google: { watchHours: 150 }, // 9000 min
+    } as WrapData;
+    expect(aggregator.calculateTopCategory(wrapData)).toBe('Video');
   });
 
-  it('should identify "Code" as top category when GitHub commits yield the highest score', () => {
-    const wrapData = scoreOnly({
-      spotify: { minutes: 100 },  // score = 100
-      google: { watchHours: 5 },   // score = 300
-      github: { commits: 1500 },  // score = 1500 * 10 = 15000
-      strava: { distanceKm: 20 },  // score = 100
-    });
-
-    const topCategory = aggregator.calculateTopCategory(wrapData);
-    expect(topCategory).toBe('Code');
+  it('returns null when there is no time-based data at all', () => {
+    const wrapData = {} as WrapData;
+    expect(aggregator.calculateTopCategory(wrapData)).toBeNull();
   });
 
-  it('should identify "Fitness" as top category when Strava distance yields the highest score', () => {
-    const wrapData = scoreOnly({
-      spotify: { minutes: 200 },   // score = 200
-      google: { watchHours: 2 },    // score = 120
-      github: { commits: 10 },     // score = 100
-      strava: { distanceKm: 1000 },// score = 1000 * 5 = 5000
-    });
-
-    const topCategory = aggregator.calculateTopCategory(wrapData);
-    expect(topCategory).toBe('Fitness');
+  it('never fabricates a category from commits or distance (no fake minute proxies)', () => {
+    const wrapData = {
+      github: { commits: 100000 },
+      strava: { distanceKm: 5000 },
+    } as WrapData;
+    expect(aggregator.calculateTopCategory(wrapData)).toBeNull();
   });
 
-  it('should handle missing or empty provider data without crashing', () => {
-    const wrapData: WrapData = {};
+  it('prefers a real-time category even when non-time metrics are huge', () => {
+    const wrapData = {
+      spotify: { minutes: 10 },
+      google: { watchHours: 1 }, // 60 min — beats Spotify's 10 min
+      github: { commits: 999999 },
+      strava: { distanceKm: 999999 },
+    } as WrapData;
+    expect(aggregator.calculateTopCategory(wrapData)).toBe('Video');
+  });
+});
 
-    const topCategory = aggregator.calculateTopCategory(wrapData);
-    expect(typeof topCategory).toBe('string');
-    expect(['Music', 'Video', 'Code', 'Fitness']).toContain(topCategory);
+describe('Aggregator - generateWrap', () => {
+  const userId = 'integration-user';
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('aggregates only real time and stores per-provider status', async () => {
+    vi.mocked(prisma.connection.findMany).mockResolvedValue([
+      { provider: 'spotify' },
+      { provider: 'google' },
+      { provider: 'github' },
+      { provider: 'strava' },
+    ] as any);
+    vi.mocked(prisma.wrap.upsert).mockResolvedValue({ data: {}, year: 2025 } as any);
+
+    const aggregator = new Aggregator(userId);
+    await aggregator.generateWrap(2025);
+
+    // Spotify 6000 min + YouTube 20h (1200 min) = 7200 min -> 120 hours.
+    const upsert = vi.mocked(prisma.wrap.upsert);
+    expect(upsert).toHaveBeenCalledTimes(1);
+    const data = upsert.mock.calls[0][0].create.data as WrapData;
+    expect(data.aggregated?.totalHours).toBe(120);
+    expect(data.aggregated?.topCategory).toBe('Music');
+    // Commits/km must NOT be converted into fake minutes.
+    expect(data.aggregated?.totalHours).not.toBeGreaterThan(121);
+    expect(data.providerStatus).toEqual({
+      spotify: { ok: true },
+      google: { ok: true },
+      github: { ok: true },
+      strava: { ok: true },
+    });
+  });
+
+  it('records per-provider failure status when a service throws a TokenError', async () => {
+    vi.mocked(prisma.connection.findMany).mockResolvedValue([
+      { provider: 'spotify' },
+      { provider: 'github' },
+    ] as any);
+    vi.mocked(prisma.wrap.upsert).mockResolvedValue({ data: {}, year: 2025 } as any);
+    const { TokenError } = await import('../base');
+    fetchDataFns.github.mockRejectedValue(new TokenError('github', 'token_expired', 'Token expired'));
+
+    const aggregator = new Aggregator(userId);
+    await aggregator.generateWrap(2025);
+
+    const data = vi.mocked(prisma.wrap.upsert).mock.calls[0][0].create.data as WrapData;
+    expect(data.providerStatus?.github).toEqual({
+      ok: false,
+      error: 'token_expired',
+      message: 'Token expired',
+    });
+    expect(data.providerStatus?.spotify).toEqual({ ok: true });
+  });
+
+  it('retries transient failures but not TokenErrors', async () => {
+    vi.mocked(prisma.connection.findMany).mockResolvedValue([{ provider: 'github' }] as any);
+    vi.mocked(prisma.wrap.upsert).mockResolvedValue({ data: {}, year: 2025 } as any);
+    const { TokenError } = await import('../base');
+
+    // First two calls fail with a network error (retryable), third succeeds.
+    fetchDataFns.github
+      .mockRejectedValueOnce(new Error('fetch failed'))
+      .mockRejectedValueOnce(new Error('fetch failed'))
+      .mockResolvedValue({ username: 'u', commits: 42, topRepo: 'r', languages: [], totalStars: 1 });
+
+    const aggregator = new Aggregator(userId);
+    await aggregator.generateWrap(2025);
+
+    const data = vi.mocked(prisma.wrap.upsert).mock.calls[0][0].create.data as WrapData;
+    expect(data.providerStatus?.github).toEqual({ ok: true });
+    expect(fetchDataFns.github).toHaveBeenCalledTimes(3);
+
+    // A TokenError should not be retried.
+    fetchDataFns.github.mockClear();
+    fetchDataFns.github.mockRejectedValue(new TokenError('github', 'token_revoked', 'Refresh failed'));
+    const aggregator2 = new Aggregator(userId);
+    await aggregator2.generateWrap(2025);
+    expect(fetchDataFns.github).toHaveBeenCalledTimes(1);
   });
 });

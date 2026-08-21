@@ -1,0 +1,3 @@
+# Staged TypeScript files are linted (and auto-fixed) via lint-staged.
+# Full typecheck + tests run in CI — keep the pre-commit fast.
+npx lint-staged

@@ -7,10 +7,12 @@
     "packages/*"
   ],
   "scripts": {
+    "prepare": "husky",
     "dev": "cd apps/web && npm run dev",
     "build": "cd apps/web && npm run build",
     "start": "cd apps/web && npm run start",
     "lint": "cd apps/web && npm run lint",
+    "lint:ci": "cd apps/web && npm run lint:ci",
     "typecheck": "cd apps/web && npm run typecheck",
     "test": "cd apps/web && npm run test",
     "test:e2e": "cd apps/web && npm run test:e2e"
@@ -19,7 +21,14 @@
     "@prisma/config": "^7.2.0",
     "@types/node": "^25.0.3",
     "dotenv": "^17.2.3",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.3.0",
     "prisma": "^7.2.0",
     "typescript": "^5"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "^7.2.0",
+    "@types/pg": "^8.23.1",
+    "pg": "^8.23.0"
   }
 }

@@ -18,8 +18,8 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { GET, POST } from '../route';
 
-function postRequest(body: unknown) {
-  return new Request('http://localhost/api/wrap/share', {
+function postRequest(body: unknown, year?: number) {
+  return new Request(`http://localhost/api/wrap/share${year ? `?year=${year}` : ''}`, {
     method: 'POST',
     body: JSON.stringify(body),
   });
@@ -32,7 +32,7 @@ describe('/api/wrap/share', () => {
 
   it('GET returns 401 when unauthenticated', async () => {
     vi.mocked(auth).mockResolvedValue(null as any);
-    const response = await GET();
+    const response = await GET(new Request('http://localhost/api/wrap/share'));
     expect(response.status).toBe(401);
   });
 
@@ -40,10 +40,23 @@ describe('/api/wrap/share', () => {
     vi.mocked(auth).mockResolvedValue({ user: { id: 'u1' } } as any);
     vi.mocked(prisma.wrap.findUnique).mockResolvedValue(null as any);
 
-    const response = await GET();
+    const response = await GET(new Request('http://localhost/api/wrap/share'));
     const body = await response.json();
 
     expect(body).toEqual({ isPublic: false, shareId: null, shareUrl: null });
+  });
+
+  it('GET resolves ?year= to the requested wrap row', async () => {
+    vi.mocked(auth).mockResolvedValue({ user: { id: 'u1' } } as any);
+    vi.mocked(prisma.wrap.findUnique).mockResolvedValue(null as any);
+
+    await GET(new Request('http://localhost/api/wrap/share?year=2024'));
+
+    expect(prisma.wrap.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { userId_year: { userId: 'u1', year: 2024 } },
+      }),
+    );
   });
 
   it('GET returns existing share status', async () => {
@@ -53,7 +66,7 @@ describe('/api/wrap/share', () => {
       shareId: 'abc123',
     } as any);
 
-    const response = await GET();
+    const response = await GET(new Request('http://localhost/api/wrap/share'));
     const body = await response.json();
 
     expect(body.isPublic).toBe(true);

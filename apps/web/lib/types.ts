@@ -32,6 +32,9 @@ export interface GitHubData {
 export interface StravaData {
   distanceKm: number;
   activities: number;
+  athleteName?: string;
+  topSport?: string;
+  elevationGain?: number;
 }
 
 export interface DuolingoData {
@@ -42,7 +45,8 @@ export interface DuolingoData {
 
 export interface AggregatedData {
   totalHours: number;
-  topCategory: string;
+  /** Real, time-based category (Music/Video) or absent when no time data exists. */
+  topCategory?: string;
 }
 
 export type ProviderErrorKind = 'not_connected' | 'token_expired' | 'token_revoked' | 'fetch_error';

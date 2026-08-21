@@ -5,20 +5,20 @@ import { YouTubeService } from './youtube';
 import { GitHubService } from './github';
 import { StravaService } from './strava';
 import { WrapData, ProviderStatus } from '../types';
-import { TokenError } from './base';
+import { TokenError, BaseService } from './base';
+import { retryWithBackoff } from '../retry';
+import { logger } from '../logger';
+import { getWrapYear } from '../wrapYear';
 
 export class Aggregator {
-  private userId: string;
-
-  constructor(userId: string) {
-    this.userId = userId;
-  }
+  constructor(private userId: string) {}
 
   /**
-   * Identifies all active connections for the user and fetches data from each.
-   * Returns per-provider status so the UI can show reconnect CTAs on failure.
+   * Fetches data from every active connection, retries transient upstream
+   * failures (but never auth failures — those need a reconnect), and stores
+   * the result. Returns per-provider status so the UI can show reconnect CTAs.
    */
-  async generateWrap(year: number = 2025) {
+  async generateWrap(year: number = getWrapYear()) {
     const connections = await prisma.connection.findMany({
       where: { userId: this.userId },
       select: { provider: true },
@@ -30,7 +30,7 @@ export class Aggregator {
 
     const promises = providers.map(async (provider) => {
       try {
-        let service;
+        let service: BaseService;
         switch (provider) {
           case 'spotify':
             service = new SpotifyService(this.userId);
@@ -39,43 +39,50 @@ export class Aggregator {
             service = new YouTubeService(this.userId);
             break;
           case 'github':
-            service = new GitHubService(this.userId);
+            service = new GitHubService(this.userId, year);
             break;
           case 'strava':
-            service = new StravaService(this.userId);
+            service = new StravaService(this.userId, year);
             break;
           default:
-            console.warn(`[Aggregator] No service implemented for provider: ${provider}`);
+            logger.warn('Aggregator: no service implemented for provider', { provider });
             providerStatus[provider] = { ok: false, error: 'not_connected', message: 'Not implemented' };
             return;
         }
 
-        const data = await service.fetchData();
+        // A TokenError means the OAuth token is gone/revoked — retrying is
+        // pointless and would just burn upstream rate limits, so only
+        // transient (network/5xx) failures are retried.
+        const data = await retryWithBackoff(() => service.fetchData(), {
+          retries: 2,
+          shouldRetry: (_attempt, err) => !(err instanceof TokenError),
+        });
         (wrapData as Record<string, unknown>)[provider] = data;
         providerStatus[provider] = { ok: true };
       } catch (err) {
         if (err instanceof TokenError) {
           providerStatus[provider] = { ok: false, error: err.kind, message: err.message };
-          console.warn(`[Aggregator] Provider ${provider} needs attention: ${err.kind}`);
+          logger.warn('Aggregator: provider needs attention', { provider, kind: err.kind });
         } else {
           providerStatus[provider] = { ok: false, error: 'fetch_error', message: 'Failed to fetch data' };
-          console.error(`[Aggregator] Failed to fetch data for ${provider}:`, err);
+          logger.error('Aggregator: failed to fetch data for provider', err, { provider });
         }
       }
     });
 
     await Promise.all(promises);
 
-    // Aggregation: only count providers that returned real data
-    let totalMinutes = 0;
-    if (wrapData.spotify?.minutes) totalMinutes += wrapData.spotify.minutes;
-    if (wrapData.google?.watchHours) totalMinutes += wrapData.google.watchHours * 60;
-    if (wrapData.github?.commits) totalMinutes += wrapData.github.commits * 10;
-    if (wrapData.strava?.distanceKm) totalMinutes += wrapData.strava.distanceKm * 5;
+    // Honest aggregation. Only *measured* time counts toward total hours and
+    // the top category. The old `commits * 10` / `km * 5` minute proxies were
+    // fabricated and are intentionally dropped (P1 "Honest aggregation") —
+    // GitHub and Strava metrics are shown as their own real counts instead.
+    const trackedMinutes =
+      (wrapData.spotify?.minutes ?? 0) + (wrapData.google?.watchHours ?? 0) * 60;
 
+    const topCategory = this.calculateTopCategory(wrapData);
     wrapData.aggregated = {
-      totalHours: Math.floor(totalMinutes / 60),
-      topCategory: this.calculateTopCategory(wrapData),
+      totalHours: Math.floor(trackedMinutes / 60),
+      ...(topCategory ? { topCategory } : {}),
     };
     wrapData.providerStatus = providerStatus;
 
@@ -83,29 +90,39 @@ export class Aggregator {
       where: {
         userId_year: {
           userId: this.userId,
-          year: year,
-        }
+          year,
+        },
       },
       update: {
         data: wrapData as unknown as Prisma.InputJsonValue,
       },
       create: {
         userId: this.userId,
-        year: year,
+        year,
         data: wrapData as unknown as Prisma.InputJsonValue,
       },
+    });
+
+    logger.info('Aggregator: wrap generated', {
+      userId: this.userId,
+      year,
+      totalHours: wrapData.aggregated.totalHours,
     });
 
     return savedWrap;
   }
 
-  public calculateTopCategory(wrapData: WrapData): string {
-    const categories = {
-        Music: wrapData.spotify?.minutes || 0,
-        Video: (wrapData.google?.watchHours || 0) * 60,
-        Code: (wrapData.github?.commits || 0) * 10,
-        Fitness: (wrapData.strava?.distanceKm || 0) * 5,
-    };
-    return Object.entries(categories).sort(([, a], [, b]) => (b as number) - (a as number))[0][0];
+  /**
+   * The category with the most real tracked time, or null when no provider
+   * returned time-based data. Only Music (Spotify minutes) and Video (YouTube
+   * watch hours) are comparable on the same axis — commits and km are not
+   * minutes, so they are never converted into a fake top category.
+   */
+  public calculateTopCategory(wrapData: WrapData): string | null {
+    const candidates: Array<[string, number]> = [];
+    if (wrapData.spotify?.minutes) candidates.push(['Music', wrapData.spotify.minutes]);
+    if (wrapData.google?.watchHours) candidates.push(['Video', wrapData.google.watchHours * 60]);
+    candidates.sort(([, a], [, b]) => b - a);
+    return candidates[0]?.[0] ?? null;
   }
 }

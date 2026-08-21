@@ -1,7 +1,6 @@
 'use client';
 
 import htmlToImage from 'html-to-image';
-import { useRef } from 'react';
 
 export default function ShareButton({ elementId }: { elementId: string }) {
     const handleShare = async () => {

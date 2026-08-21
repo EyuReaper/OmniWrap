@@ -1,5 +1,7 @@
 import { decrypt, encrypt } from '../crypto';
 import { prisma } from '../prisma';
+import { fetchWithRetry } from '../retry';
+import { logger } from '../logger';
 
 const TOKEN_REFRESH_BUFFER_MS = 5 * 60 * 1000; // refresh 5 min before expiry
 
@@ -16,7 +18,7 @@ async function refreshAccessToken(
 ): Promise<RefreshResult> {
   switch (provider) {
     case 'spotify': {
-      const resp = await fetch('https://accounts.spotify.com/api/token', {
+      const resp = await fetchWithRetry('https://accounts.spotify.com/api/token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({
@@ -27,7 +29,7 @@ async function refreshAccessToken(
         }),
       });
       if (!resp.ok) throw new Error(`Spotify token refresh failed: ${resp.status}`);
-      const data = await resp.json() as {
+      const data = (await resp.json()) as {
         access_token: string;
         refresh_token?: string;
         expires_in: number;
@@ -39,7 +41,7 @@ async function refreshAccessToken(
       };
     }
     case 'google': {
-      const resp = await fetch('https://oauth2.googleapis.com/token', {
+      const resp = await fetchWithRetry('https://oauth2.googleapis.com/token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({
@@ -50,7 +52,7 @@ async function refreshAccessToken(
         }),
       });
       if (!resp.ok) throw new Error(`Google token refresh failed: ${resp.status}`);
-      const data = await resp.json() as {
+      const data = (await resp.json()) as {
         access_token: string;
         refresh_token?: string;
         expires_in: number;
@@ -62,7 +64,7 @@ async function refreshAccessToken(
       };
     }
     case 'strava': {
-      const resp = await fetch('https://www.strava.com/oauth/token', {
+      const resp = await fetchWithRetry('https://www.strava.com/oauth/token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({
@@ -73,7 +75,7 @@ async function refreshAccessToken(
         }),
       });
       if (!resp.ok) throw new Error(`Strava token refresh failed: ${resp.status}`);
-      const data = await resp.json() as {
+      const data = (await resp.json()) as {
         access_token: string;
         refresh_token?: string;
         expires_at?: number;
@@ -156,7 +158,7 @@ export async function getValidAccessToken(
 
     return refreshed.accessToken;
   } catch (err) {
-    console.error(`[BaseService] Token refresh failed for ${provider}:`, err);
+    logger.error(`Token refresh failed for provider`, err, { provider });
     throw new TokenError(provider, 'token_revoked', 'Token refresh failed');
   }
 }
@@ -182,7 +184,7 @@ export abstract class BaseService {
 
   protected handleError(error: unknown): never {
     if (error instanceof TokenError) throw error;
-    console.error(`Error in ${this.provider} service:`, error);
+    logger.error(`Error in provider service`, error, { provider: this.provider });
     throw new TokenError(this.provider, 'fetch_error', 'Failed to fetch data');
   }
 }

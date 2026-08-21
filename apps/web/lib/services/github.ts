@@ -2,7 +2,10 @@ import { Octokit } from '@octokit/core';
 import { BaseService } from './base';
 
 export class GitHubService extends BaseService {
-  constructor(userId: string) {
+  constructor(
+    userId: string,
+    private year: number,
+  ) {
     super(userId, 'github');
   }
 
@@ -20,9 +23,9 @@ export class GitHubService extends BaseService {
         per_page: 100,
       });
 
-      // 3. Get Real Commit Count for 2025
+      // 3. Real commit count for the wrap year (committer-date range).
       const { data: commitSearch } = await octokit.request('GET /search/commits', {
-        q: `author:${user.login} committer-date:2025-01-01..2025-12-31`,
+        q: `author:${user.login} committer-date:${this.year}-01-01..${this.year}-12-31`,
       });
 
       let totalStars = 0;
@@ -37,7 +40,7 @@ export class GitHubService extends BaseService {
       return {
         username: user.login,
         commits: commitSearch.total_count || 0,
-        topRepo: topRepo,
+        topRepo,
         languages: Array.from(languages).slice(0, 3),
         totalStars,
       };

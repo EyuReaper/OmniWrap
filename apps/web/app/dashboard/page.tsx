@@ -7,6 +7,7 @@ import Reveal from '@/components/motion/Reveal';
 import { Button } from '@/components/ui/Button';
 import { auth } from '@/lib/auth';
 import { getConnectionStatuses } from '@/lib/connections';
+import { getWrapYear } from '@/lib/wrapYear';
 import DashboardClient from './DashboardClient';
 
 const oauthErrorMessages: Record<string, string> = {
@@ -56,6 +57,7 @@ export default async function DashboardPage({
   return (
     <DashboardClient
       userName={session.user.name}
+      year={getWrapYear()}
       initialConnections={connections}
       initialError={error ? (oauthErrorMessages[error] ?? 'Something went wrong connecting that service.') : undefined}
     />

@@ -1,0 +1,91 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # lib/env.ts validates at import time; unit tests and the build only need
+  # well-formed values, not live services. E2E uses a real Postgres service.
+  NEXTAUTH_SECRET: ci_secret_not_used_in_prod
+  ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+  SPOTIFY_CLIENT_ID: ci-spotify-id
+  SPOTIFY_CLIENT_SECRET: ci-spotify-secret
+  GITHUB_CLIENT_ID: ci-github-id
+  GITHUB_CLIENT_SECRET: ci-github-secret
+  GOOGLE_CLIENT_ID: ci-google-id
+  GOOGLE_CLIENT_SECRET: ci-google-secret
+  LINKEDIN_CLIENT_ID: ci-linkedin-id
+  LINKEDIN_CLIENT_SECRET: ci-linkedin-secret
+  STRAVA_CLIENT_ID: ci-strava-id
+  STRAVA_CLIENT_SECRET: ci-strava-secret
+  WRAP_YEAR: '2025'
+
+jobs:
+  verify:
+    name: Lint, typecheck, unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npm run lint:ci
+      - run: npm run typecheck
+      - run: npm run test
+
+  build:
+    name: Production build
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/omniwrap_ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx prisma generate
+      # No DB reachable here — build must not need one (pages that query are dynamic).
+      - run: npm run build
+
+  e2e:
+    name: E2E smoke
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: omniwrap_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/omniwrap_e2e
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npx prisma db push --skip-generate
+      - run: npx playwright install chromium --with-deps
+      - run: npm run build
+      - run: npm run test:e2e

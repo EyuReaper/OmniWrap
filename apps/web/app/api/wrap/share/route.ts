@@ -3,22 +3,31 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { SITE_URL } from '@/lib/site';
-
-const YEAR = 2025;
+import { getWrapYear, isValidWrapYear } from '@/lib/wrapYear';
 
 function shareUrlFor(shareId: string) {
   return `${SITE_URL}/share/${shareId}`;
 }
 
+/** Resolves ?year= to a valid wrap year, defaulting to the recap-season year. */
+function parseYear(request: Request): number {
+  const raw = new URL(request.url).searchParams.get('year');
+  const parsed = Number(raw);
+  if (raw !== null && Number.isFinite(parsed) && isValidWrapYear(parsed)) {
+    return parsed;
+  }
+  return getWrapYear();
+}
+
 /** Current public-sharing status for the caller's wrap. */
-export async function GET() {
+export async function GET(request: Request) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   const wrap = await prisma.wrap.findUnique({
-    where: { userId_year: { userId: session.user.id, year: YEAR } },
+    where: { userId_year: { userId: session.user.id, year: parseYear(request) } },
     select: { isPublic: true, shareId: true },
   });
 
@@ -34,17 +43,17 @@ export async function GET() {
 }
 
 /** Toggles public sharing for the caller's wrap. Body: { enabled: boolean } */
-export async function POST(req: Request) {
+export async function POST(request: Request) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const body = await req.json().catch(() => null);
+  const body = await request.json().catch(() => null);
   const enabled = Boolean(body?.enabled);
 
   const wrap = await prisma.wrap.findUnique({
-    where: { userId_year: { userId: session.user.id, year: YEAR } },
+    where: { userId_year: { userId: session.user.id, year: parseYear(request) } },
   });
 
   if (!wrap) {

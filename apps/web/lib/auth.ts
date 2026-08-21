@@ -10,10 +10,10 @@ import GoogleProvider from "next-auth/providers/google";
 import GitHub from "next-auth/providers/github";
 import LinkedInProvider from "next-auth/providers/linkedin";
 import StravaProvider from "next-auth/providers/strava";
-import { encrypt } from "@/lib/crypto";
 import { prisma } from "@/lib/prisma";
 import { env } from "@/lib/env";
 import { logAudit } from "@/lib/auditLog";
+import { syncConnectionFromAccount } from "@/lib/syncConnection";
 
 /** Extra options merged into a provider stub by the caller. */
 type ProviderStubOptions = Record<string, unknown>;
@@ -80,6 +80,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     SpotifyProvider({
       clientId: env.SPOTIFY_CLIENT_ID,
       clientSecret: env.SPOTIFY_CLIENT_SECRET,
+      // Least privilege for the wrap fetcher: top items + recently played +
+      // the profile claims NextAuth needs. `playlist-*`, `user-follow-*`, and
+      // `user-library-*` are deliberately not requested.
+      authorization: {
+        params: { scope: "user-top-read user-read-recently-played user-read-email user-read-private" },
+      },
     }),
     GoogleProvider({
       clientId: env.GOOGLE_CLIENT_ID,
@@ -93,10 +99,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     GitHub({
       clientId: env.GITHUB_CLIENT_ID,
       clientSecret: env.GITHUB_CLIENT_SECRET,
+      // Default scope (public read-only) is the minimum for our fetcher —
+      // /user, /user/repos and /search/commits all work without private access.
     }),
     StravaProvider({
       clientId: env.STRAVA_CLIENT_ID,
       clientSecret: env.STRAVA_CLIENT_SECRET,
+      // `read` (profile) + `activity:read` (own activities) is the minimum the
+      // wrap fetcher needs. `activity:read_all` (private activities) is not
+      // requested — see docs/oauth-scopes.md.
+      authorization: { params: { scope: "read,activity:read" } },
     }),
     LinkedInProvider({
       clientId: env.LINKEDIN_CLIENT_ID,
@@ -105,6 +117,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   secret: env.NEXTAUTH_SECRET,
+  // NextAuth v5 refuses to trust the Host header in production by default,
+  // which breaks `auth()` inside proxy.ts (Next 16 middleware) and the API
+  // session endpoints on Vercel/serverless hosts. This app is always served
+  // behind a known host, so trust it.
+  trustHost: true,
   session: { strategy: "database" },
   callbacks: {
     async session({ session, user }) {
@@ -125,31 +142,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   events: {
     async signIn({ user, account }) {
       if (account && user.id) {
-        console.log(`[NextAuth] Syncing ${account.provider} connection for user: ${user.id}`);
-        const encryptedAccessToken = account.access_token ? encrypt(account.access_token) : null;
-        const encryptedRefreshToken = account.refresh_token ? encrypt(account.refresh_token) : null;
-
-        await prisma.connection.upsert({
-          where: {
-            userId_provider: {
-              userId: user.id,
-              provider: account.provider,
-            },
-          },
-          update: {
-            accessToken: encryptedAccessToken,
-            refreshToken: encryptedRefreshToken,
-            expiresAt: account.expires_at ? new Date(account.expires_at * 1000) : null,
-          },
-          create: {
-            userId: user.id,
-            provider: account.provider,
-            accessToken: encryptedAccessToken,
-            refreshToken: encryptedRefreshToken,
-            expiresAt: account.expires_at ? new Date(account.expires_at * 1000) : null,
-          },
-        });
-
+        await syncConnectionFromAccount(user.id, account);
         await logAudit(user.id, "connection.connect", {
           userEmail: user.email,
           metadata: { provider: account.provider },

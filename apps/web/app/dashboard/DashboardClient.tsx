@@ -36,10 +36,12 @@ function toMap(list: ConnectionInfo[]): Record<string, ConnectionInfo> {
  */
 export default function DashboardClient({
   userName,
+  year,
   initialConnections,
   initialError,
 }: {
   userName?: string | null;
+  year: number;
   initialConnections: ConnectionInfo[];
   initialError?: string;
 }) {
@@ -243,7 +245,7 @@ export default function DashboardClient({
             transition={{ delay: 0.4 }}
             className="mt-3 text-base md:text-lg text-text-muted font-light"
           >
-            Connect your 2025 digital world
+            Connect your {year} digital world
           </motion.p>
         </motion.div>
 
@@ -502,7 +504,7 @@ export default function DashboardClient({
               whileTap={{ scale: 0.96 }}
               className="relative px-12 py-5 min-h-[44px] text-xl md:text-2xl font-black text-white rounded-2xl overflow-hidden bg-gradient-to-r from-[#1DB954] via-[#9333EA] to-[#FF0000] shadow-[0_0_50px_rgba(29,185,84,0.4)] group disabled:opacity-60"
             >
-              <span className="relative z-10">Generate Your 2025 Wrap</span>
+              <span className="relative z-10">Generate Your {year} Wrap</span>
               <div className="absolute inset-0 bg-gradient-to-r from-[#1DB954]/30 via-[#9333EA]/30 to-[#FF0000]/30 opacity-0 group-hover:opacity-100 transition-opacity duration-700 blur-xl" />
             </motion.button>
           </Link>

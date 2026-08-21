@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import Footer from '@/components/Footer';
 import Reveal from '@/components/motion/Reveal';
+import { getWrapYear } from '@/lib/wrapYear';
 
 const steps = [
   {
@@ -153,7 +154,7 @@ export default function Home() {
 
           <div className="w-full max-w-sm aspect-[4/5] p-8 rounded-3xl flex flex-col justify-between border-4 border-border shadow-2xl bg-gradient-to-b from-black via-gray-950 to-black text-white">
             <div>
-              <h3 className="text-3xl font-black mb-1 text-[var(--spotify-green)]">OmniWrap 2025</h3>
+              <h3 className="text-3xl font-black mb-1 text-[var(--spotify-green)]">OmniWrap {getWrapYear()}</h3>
               <p className="opacity-70 text-sm italic">Sample data — not a real account</p>
             </div>
             <div className="space-y-3 text-sm">

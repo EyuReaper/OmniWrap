@@ -1,25 +1,20 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import 'swiper/css';
 import 'swiper/css/pagination';
 import { Pagination, Autoplay, EffectFade } from 'swiper/modules';
 import Confetti from 'react-confetti';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import * as htmlToImage from 'html-to-image';
 import Link from 'next/link';
 import { WrapData } from '@/lib/types';
 import { Swiper as SwiperType } from 'swiper';
 import { SkeletonBlock, SkeletonText } from '@/components/ui/Skeleton';
 import { useToast } from '@/components/ui/Toast';
-
-const musicTracks = [
-  { name: 'Neon Pulse', url: 'https://cdn.pixabay.com/download/audio/2022/11/10/audio_3c4d5e6f7g.mp3?filename=cyberpunk-2099-130007.mp3' },
-  { name: 'Chill Synth', url: 'https://cdn.pixabay.com/download/audio/2023/02/28/audio_8b7d9f8c8a.mp3?filename=lofi-hip-hop-130006.mp3' },
-  { name: 'Epic Beat', url: 'https://cdn.pixabay.com/download/audio/2024/01/15/audio_7f8c9d0e1b.mp3?filename=epic-cinematic-trailer-129846.mp3' },
-];
+import { reportError } from '@/lib/errorMonitoring';
 
 const themes = {
   default: {
@@ -53,7 +48,7 @@ const themes = {
     text: 'text-zinc-800',
     accent: 'text-zinc-500',
     chart: '#52525b',
-  }
+  },
 };
 
 type ExportFormat = 'card' | 'square' | 'story';
@@ -69,24 +64,38 @@ export interface InitialShareState {
   shareUrl: string | null;
 }
 
+const PROVIDER_LABELS: Record<string, string> = {
+  spotify: 'Spotify', google: 'YouTube', github: 'GitHub', strava: 'Strava',
+};
+
+function formatGeneratedAt(iso: string | null): string {
+  if (!iso) return 'Not generated yet';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return 'Unknown';
+  return date.toLocaleString();
+}
+
 /**
  * Interactive wrap playback. The Server Component hands over the cached wrap
  * when one exists; generation (which fans out to every provider API) still runs
- * through POST-like GET /api/wrap so a first-time visit doesn't block TTFB.
+ * through GET /api/wrap so a first-time visit doesn't block TTFB. The Refresh
+ * button forces a POST, and the cache age comes back in X-Wrap-Generated-At.
  */
 export default function WrapExperience({
   initialData,
   initialShare,
+  year,
 }: {
   initialData: WrapData | null;
   initialShare: InitialShareState;
+  year: number;
 }) {
   const [data, setData] = useState<WrapData | null>(initialData);
   const [loading, setLoading] = useState(initialData === null);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [generatedAt, setGeneratedAt] = useState<string | null>(null);
   const [showConfetti, setShowConfetti] = useState(false);
-  const [currentTrack, setCurrentTrack] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(false);
   const [currentTheme, setCurrentTheme] = useState<keyof typeof themes>('default');
   const [exportFormat, setExportFormat] = useState<ExportFormat>('card');
   const [includeWatermark, setIncludeWatermark] = useState(true);
@@ -94,7 +103,6 @@ export default function WrapExperience({
   const [shareUrl, setShareUrl] = useState<string | null>(initialShare.shareUrl);
   const [shareLoading, setShareLoading] = useState(false);
 
-  const audioRef = useRef<HTMLAudioElement>(null);
   const shareCardRef = useRef<HTMLDivElement>(null);
   const theme = themes[currentTheme];
   const prefersReducedMotion = useReducedMotion();
@@ -110,11 +118,14 @@ export default function WrapExperience({
         const res = await fetch('/api/wrap');
         if (!res.ok) throw new Error('Failed to fetch wrap');
         const json = (await res.json()) as WrapData;
-        if (!cancelled) setData(json);
-      } catch (err) {
-        console.error('Wrap Fetch Error:', err);
         if (!cancelled) {
-          setError('Could not load your 2025 Wrap. Make sure you are logged in and have connected at least one service!');
+          setData(json);
+          setGeneratedAt(res.headers.get('X-Wrap-Generated-At'));
+        }
+      } catch (err) {
+        reportError(err, { scope: 'wrap.fetch', year });
+        if (!cancelled) {
+          setError(`Could not load your ${year} Wrap. Make sure you are logged in and have connected at least one service!`);
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -125,7 +136,24 @@ export default function WrapExperience({
     return () => {
       cancelled = true;
     };
-  }, [initialData]);
+  }, [initialData, year]);
+
+  const refreshWrap = async () => {
+    setRefreshing(true);
+    try {
+      const res = await fetch('/api/wrap', { method: 'POST' });
+      if (!res.ok) throw new Error('Failed to refresh wrap');
+      const json = (await res.json()) as WrapData;
+      setData(json);
+      setGeneratedAt(res.headers.get('X-Wrap-Generated-At'));
+      showToast('Your wrap has been refreshed!', 'success');
+    } catch (err) {
+      reportError(err, { scope: 'wrap.refresh', year });
+      showToast('Could not refresh your wrap. Please try again.', 'error');
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -156,40 +184,68 @@ export default function WrapExperience({
     );
   }
 
+  const hasAnyProviderData = Boolean(
+    data.spotify || data.google || data.github || data.strava || data.duolingo,
+  );
+  const failedProviders = Object.entries(data.providerStatus ?? {}).filter(([, s]) => !s.ok);
+
+  // Empty wrap: no connections returned data (or there were no connections at
+  // all). Guide the user to the dashboard instead of showing empty slides.
+  if (!hasAnyProviderData) {
+    return (
+      <div className="min-h-screen bg-black flex flex-col items-center justify-center p-8 text-center">
+        <h1 className="text-4xl font-black text-white mb-4">No data yet</h1>
+        <p className="text-xl text-gray-400 mb-8 max-w-lg">
+          Connect at least one service to unlock your {year} OmniWrap.
+        </p>
+        {failedProviders.length > 0 && (
+          <div className="w-full max-w-md mb-8 bg-white/5 rounded-2xl p-5 text-left space-y-3">
+            <p className="text-sm font-bold text-white/80 uppercase tracking-wider">
+              Services that need attention
+            </p>
+            {failedProviders.map(([provider, status]) => (
+              <div key={provider} className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className="w-3 h-3 rounded-full bg-yellow-400 shrink-0" />
+                  <span className="font-semibold text-white truncate">
+                    {PROVIDER_LABELS[provider] ?? provider}
+                  </span>
+                </div>
+                <span className="text-sm text-gray-400 truncate">{status.message || status.error}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="flex flex-col sm:flex-row gap-4">
+          <Link href="/dashboard">
+            <button className="px-8 py-4 bg-[#1DB954] text-black font-bold rounded-xl hover:scale-105 transition-all">
+              Connect services
+            </button>
+          </Link>
+          <button
+            onClick={refreshWrap}
+            disabled={refreshing}
+            className="px-8 py-4 bg-white/10 text-white font-bold rounded-xl hover:bg-white/20 transition-all disabled:opacity-50"
+          >
+            {refreshing ? 'Refreshing…' : 'Try again'}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Honest chart: only real, measured time (Spotify minutes + YouTube watch
+  // hours) appears as "hours". Commits and km are shown as their own counts on
+  // their own slides — never converted into fake hours.
   const chartData = [
     { name: 'Spotify', hours: (data.spotify?.minutes || 0) / 60 },
     { name: 'YouTube', hours: data.google?.watchHours || 0 },
-    { name: 'Strava', hours: (data.strava?.distanceKm || 0) / 10 },
-    { name: 'GitHub', hours: (data.github?.commits || 0) / 20 },
-  ].filter(d => d.hours > 0);
+  ].filter((d) => d.hours > 0);
 
   const handleSlideChange = (swiper: SwiperType) => {
     if (swiper.activeIndex === 7 && !prefersReducedMotion) {
       setShowConfetti(true);
       setTimeout(() => setShowConfetti(false), 8000);
-    }
-  };
-
-  const togglePlay = () => {
-    if (audioRef.current) {
-      if (isPlaying) {
-        audioRef.current.pause();
-      } else {
-        audioRef.current.play().catch(() => {
-          showToast('Playback is unavailable right now.', 'error');
-        });
-      }
-      setIsPlaying(!isPlaying);
-    }
-  };
-
-  const changeTrack = (index: number) => {
-    if (audioRef.current) {
-      setCurrentTrack(index);
-      audioRef.current.src = musicTracks[index].url;
-      if (isPlaying) {
-        audioRef.current.play();
-      }
     }
   };
 
@@ -201,12 +257,12 @@ export default function WrapExperience({
         const pixelRatio = renderedWidth > 0 ? exportFormats[exportFormat].width / renderedWidth : 2;
         const dataUrl = await htmlToImage.toPng(node, { pixelRatio });
         const link = document.createElement('a');
-        link.download = `omniwrap-2025-${currentTheme}-${exportFormat}.png`;
+        link.download = `omniwrap-${year}-${currentTheme}-${exportFormat}.png`;
         link.href = dataUrl;
         link.click();
         showToast('Share card downloaded!', 'success');
       } catch (err) {
-        console.error('Could not generate image', err);
+        reportError(err, { scope: 'wrap.shareCard', year, theme: currentTheme, format: exportFormat });
         showToast('Could not generate the share card. Please try again.', 'error');
       }
     }
@@ -215,7 +271,7 @@ export default function WrapExperience({
   const toggleShare = async (enabled: boolean) => {
     setShareLoading(true);
     try {
-      const res = await fetch('/api/wrap/share', {
+      const res = await fetch(`/api/wrap/share?year=${year}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ enabled }),
@@ -226,7 +282,7 @@ export default function WrapExperience({
       setShareUrl(json.shareUrl ?? null);
       showToast(enabled ? 'Your wrap snapshot is now public.' : 'Your wrap snapshot is now private.', 'success');
     } catch (err) {
-      console.error('Share toggle error:', err);
+      reportError(err, { scope: 'wrap.shareToggle', year });
       showToast('Could not update sharing settings. Please try again.', 'error');
     } finally {
       setShareLoading(false);
@@ -239,7 +295,7 @@ export default function WrapExperience({
       await navigator.clipboard.writeText(shareUrl);
       showToast('Link copied to clipboard!', 'success');
     } catch (err) {
-      console.error('Clipboard error:', err);
+      reportError(err, { scope: 'wrap.clipboard' });
       showToast('Could not copy the link.', 'error');
     }
   };
@@ -248,31 +304,18 @@ export default function WrapExperience({
     <div className={`relative min-h-screen overflow-hidden transition-colors duration-1000 ${theme.bg}`}>
       {showConfetti && !prefersReducedMotion && <Confetti numberOfPieces={400} recycle={false} gravity={0.1} />}
 
-      {/* Floating Music Player */}
-      <div className="fixed bottom-6 right-6 z-50 flex items-center gap-4 bg-black/70 backdrop-blur-2xl border border-white/10 rounded-full px-6 py-4 shadow-2xl">
+      {/* Refresh control + last-updated timestamp */}
+      <div className="fixed top-5 right-5 z-50 flex items-center gap-3 bg-black/70 backdrop-blur-2xl border border-white/10 rounded-full px-4 py-2.5 shadow-2xl">
         <button
-          onClick={togglePlay}
-          aria-label={isPlaying ? 'Pause background music' : 'Play background music'}
-          aria-pressed={isPlaying}
-          className="text-2xl text-white hover:text-[#1DB954] transition-colors focus:outline-none"
+          onClick={refreshWrap}
+          disabled={refreshing}
+          className="text-sm font-bold text-white hover:text-[#1DB954] transition-colors focus:outline-none disabled:opacity-50"
         >
-          {isPlaying ? '⏸' : '▶️'}
+          {refreshing ? 'Refreshing…' : '↻ Refresh'}
         </button>
-        <span className="text-sm font-medium text-gray-200 min-w-[140px] text-center truncate max-w-[150px]">
-          {musicTracks[currentTrack].name}
+        <span className="text-xs text-gray-400" title="Last generated">
+          {formatGeneratedAt(generatedAt)}
         </span>
-        <div className="flex gap-3">
-          {musicTracks.map((track, idx) => (
-            <button
-              key={idx}
-              onClick={() => changeTrack(idx)}
-              aria-label={`Play track: ${track.name}`}
-              aria-current={currentTrack === idx}
-              className={`w-4 h-4 rounded-full transition-all duration-300 ${currentTrack === idx ? 'bg-[#1DB954] scale-125 shadow-[0_0_12px_#1DB954]' : 'bg-gray-600 hover:bg-gray-400'}`}
-            />
-          ))}
-        </div>
-        <audio ref={audioRef} src={musicTracks[0].url} loop />
       </div>
 
       <Swiper
@@ -290,7 +333,7 @@ export default function WrapExperience({
         <SwiperSlide className="flex items-center justify-center">
           <motion.div initial={{ opacity: 0, y: 80 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1.4 }} className="text-center px-8">
             <h1 className={`text-6xl md:text-8xl font-black bg-clip-text text-transparent bg-gradient-to-r ${currentTheme === 'minimal' ? 'from-zinc-900 to-zinc-500' : 'from-white via-purple-300 to-indigo-300'} tracking-tighter mb-6`}>
-              OmniWrap 2025
+              OmniWrap {year}
             </h1>
             <p className={`text-2xl md:text-3xl font-light ${theme.text}`}>Your digital year, unified.</p>
           </motion.div>
@@ -301,9 +344,14 @@ export default function WrapExperience({
           <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} className="text-center">
             <h2 className={`text-7xl md:text-9xl font-black mb-8 ${theme.text}`}>READY?</h2>
             <div className="flex justify-center gap-4">
-               {[1, 2, 3].map(i => (
-                 <motion.div key={i} animate={{ scale: [1, 1.2, 1], opacity: [0.3, 1, 0.3] }} transition={{ repeat: Infinity, duration: 2, delay: i * 0.4 }} className={`w-4 h-4 rounded-full ${currentTheme === 'minimal' ? 'bg-zinc-800' : 'bg-white'}`} />
-               ))}
+              {[1, 2, 3].map((i) => (
+                <motion.div
+                  key={i}
+                  animate={{ scale: [1, 1.2, 1], opacity: [0.3, 1, 0.3] }}
+                  transition={{ repeat: Infinity, duration: 2, delay: i * 0.4 }}
+                  className={`w-4 h-4 rounded-full ${currentTheme === 'minimal' ? 'bg-zinc-800' : 'bg-white'}`}
+                />
+              ))}
             </div>
           </motion.div>
         </SwiperSlide>
@@ -385,7 +433,7 @@ export default function WrapExperience({
                   <span className="text-4xl">🏃</span>
                 </div>
                 <p className="text-6xl font-black">{data.strava.distanceKm} km</p>
-                <p className="text-xl opacity-60 mt-2">Conquered in 2025</p>
+                <p className="text-xl opacity-60 mt-2">Conquered in {year}</p>
                 <p className="text-2xl font-bold mt-8 text-white/80">{data.strava.activities} Sessions across the year</p>
               </div>
             </motion.div>
@@ -416,54 +464,52 @@ export default function WrapExperience({
         )}
 
         {/* Slide 6.5: Reconnect CTA for failed providers */}
-        {data.providerStatus && (() => {
-          const failed = Object.entries(data.providerStatus).filter(([, s]) => !s.ok);
-          if (failed.length === 0) return null;
-          const providerLabels: Record<string, string> = {
-            spotify: 'Spotify', google: 'YouTube', github: 'GitHub', strava: 'Strava',
-          };
-          const providerColors: Record<string, string> = {
-            spotify: '#1DB954', google: '#FF0000', github: '#6F42C1', strava: '#FC4C02',
-          };
-          return (
-            <SwiperSlide className="flex items-center justify-center">
-              <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className={`w-full max-w-4xl p-12 rounded-3xl border shadow-2xl mx-4 backdrop-blur-xl ${theme.card} ${theme.text}`}>
-                <h2 className="text-4xl font-black mb-8 text-center text-yellow-400">Some Services Need Attention</h2>
-                <p className="text-lg opacity-60 text-center mb-8">Reconnect to include their data in your wrap:</p>
-                <div className="flex flex-col gap-4">
-                  {failed.map(([provider, status]) => (
-                    <div key={provider} className="flex items-center justify-between p-4 bg-white/5 rounded-xl">
-                      <div className="flex items-center gap-3">
-                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: providerColors[provider] || '#888' }} />
-                        <span className="font-bold">{providerLabels[provider] || provider}</span>
-                        <span className="text-sm opacity-75">{status.message || status.error}</span>
-                      </div>
-                      <Link href="/dashboard">
-                        <button className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm font-bold transition-all">
-                          Reconnect
-                        </button>
-                      </Link>
+        {failedProviders.length > 0 && (
+          <SwiperSlide className="flex items-center justify-center">
+            <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className={`w-full max-w-4xl p-12 rounded-3xl border shadow-2xl mx-4 backdrop-blur-xl ${theme.card} ${theme.text}`}>
+              <h2 className="text-4xl font-black mb-8 text-center text-yellow-400">Some Services Need Attention</h2>
+              <p className="text-lg opacity-60 text-center mb-8">Reconnect to include their data in your wrap:</p>
+              <div className="flex flex-col gap-4">
+                {failedProviders.map(([provider, status]) => (
+                  <div key={provider} className="flex items-center justify-between p-4 bg-white/5 rounded-xl">
+                    <div className="flex items-center gap-3">
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: theme.chart }} />
+                      <span className="font-bold">{PROVIDER_LABELS[provider] ?? provider}</span>
+                      <span className="text-sm opacity-75">{status.message || status.error}</span>
                     </div>
-                  ))}
-                </div>
-              </motion.div>
-            </SwiperSlide>
-          );
-        })()}
+                    <Link href="/dashboard">
+                      <button className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm font-bold transition-all">
+                        Reconnect
+                      </button>
+                    </Link>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          </SwiperSlide>
+        )}
 
         {/* Slide 7: The Legend (Aggregated) */}
         <SwiperSlide className="flex items-center justify-center">
           <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className={`w-full max-w-5xl p-12 rounded-3xl border shadow-2xl mx-4 backdrop-blur-xl ${theme.card} ${theme.text} text-center`}>
             <h2 className={`text-6xl font-black mb-6 bg-clip-text text-transparent bg-gradient-to-r from-green-400 via-purple-500 to-red-500`}>YOU ARE A LEGEND</h2>
-            <p className="text-3xl mb-12">Total Connected Time: <span className="font-black text-white">{data.aggregated?.totalHours || 0} Hours</span></p>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={chartData}>
-                <XAxis dataKey="name" hide />
-                <Tooltip contentStyle={{ background: '#000', border: 'none', borderRadius: '8px' }} />
-                <Bar dataKey="hours" fill={theme.chart} radius={[10, 10, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-            <p className="mt-10 text-xl opacity-60">You&apos;ve mastered the digital realm in 2025.</p>
+            <p className="text-3xl mb-12">
+              Total Tracked Time: <span className="font-black text-white">{data.aggregated?.totalHours || 0} Hours</span>
+            </p>
+            {chartData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={chartData}>
+                  <XAxis dataKey="name" hide />
+                  <Tooltip contentStyle={{ background: '#000', border: 'none', borderRadius: '8px' }} />
+                  <Bar dataKey="hours" fill={theme.chart} radius={[10, 10, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <p className="text-xl opacity-60">
+                Time-based data (music/video) wasn&apos;t available — your other stats are on the slides above.
+              </p>
+            )}
+            <p className="mt-10 text-xl opacity-60">You&apos;ve mastered the digital realm in {year}.</p>
           </motion.div>
         </SwiperSlide>
 
@@ -495,14 +541,14 @@ export default function WrapExperience({
 
             <div ref={shareCardRef} className={`relative w-full max-w-sm ${exportFormats[exportFormat].aspect} ${exportFormats[exportFormat].padding} rounded-3xl flex flex-col border-4 shadow-2xl ${theme.bg} ${theme.card} ${theme.text} ${includeWatermark ? 'pb-14' : ''}`} style={{ borderColor: 'rgba(255,255,255,0.1)' }}>
               <div>
-                <h3 className={`text-4xl font-black mb-2 ${theme.accent}`}>OmniWrap 2025</h3>
+                <h3 className={`text-4xl font-black mb-2 ${theme.accent}`}>OmniWrap {year}</h3>
                 <p className="opacity-70 text-lg italic">My Digital Legacy</p>
               </div>
               <div className="space-y-4 flex-1 flex flex-col justify-center">
-                 <div className="flex justify-between border-b border-white/10 pb-2"><span>Total Activity</span><span className="font-black">{data.aggregated?.totalHours || 0}h</span></div>
-                 <div className="flex justify-between border-b border-white/10 pb-2"><span>Code Commits</span><span className="font-black">{data.github?.commits || 0}</span></div>
-                 <div className="flex justify-between border-b border-white/10 pb-2"><span>Fitness</span><span className="font-black">{data.strava?.distanceKm || 0}km</span></div>
-                 <div className="flex justify-between border-b border-white/10 pb-2"><span>Top Track</span><span className="font-black truncate max-w-[100px]">{data.spotify?.topSong || 'N/A'}</span></div>
+                <div className="flex justify-between border-b border-white/10 pb-2"><span>Tracked Time</span><span className="font-black">{data.aggregated?.totalHours || 0}h</span></div>
+                <div className="flex justify-between border-b border-white/10 pb-2"><span>Code Commits</span><span className="font-black">{data.github?.commits || 0}</span></div>
+                <div className="flex justify-between border-b border-white/10 pb-2"><span>Fitness</span><span className="font-black">{data.strava?.distanceKm || 0}km</span></div>
+                <div className="flex justify-between border-b border-white/10 pb-2"><span>Top Track</span><span className="font-black truncate max-w-[100px]">{data.spotify?.topSong || 'N/A'}</span></div>
               </div>
               {includeWatermark && (
                 <div className="absolute bottom-3 right-3 px-3 py-1 rounded-full bg-black/50 backdrop-blur-sm">
@@ -544,21 +590,20 @@ export default function WrapExperience({
               <button onClick={downloadShareCard} className={`flex-1 max-w-xs px-10 py-4 text-xl font-black rounded-full shadow-xl transition-all hover:scale-105 ${currentTheme === 'minimal' ? 'bg-black text-white' : 'bg-white text-black'}`}>
                 Download Image
               </button>
-              
-              <button 
+
+              <button
                 onClick={() => {
-                  const text = `Check out my 2025 OmniWrap! I spent ${data.aggregated?.totalHours || 0} hours across my digital life. Generate yours at omniwrap.com 🔥 #OmniWrap2025`;
+                  const text = `Check out my ${year} OmniWrap! I spent ${data.aggregated?.totalHours || 0} hours across my digital life. Generate yours at omniwrap.com 🔥 #OmniWrap${year}`;
                   window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`, '_blank');
                 }}
                 className="flex-1 max-w-xs px-10 py-4 text-xl font-black rounded-full bg-[#1DA1F2] text-white shadow-xl transition-all hover:scale-105 flex items-center justify-center gap-2"
               >
                 <span>Share to X</span>
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.045 4.126H5.078z"/></svg>
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.045 4.126H5.078z" /></svg>
               </button>
             </div>
           </motion.div>
         </SwiperSlide>
-
       </Swiper>
     </div>
   );
