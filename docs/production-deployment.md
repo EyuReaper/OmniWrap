@@ -11,7 +11,7 @@ until the adoption checklist at the bottom of each of those documents is done.
 | Component | Requirement |
 |---|---|
 | Postgres | Managed instance (Neon/Supabase/RDS). Note the **pooled** connection string (pgBouncer port 6543 on Supabase, `-pooler` host on Neon) and the **direct** one for migrations |
-| OAuth apps | One set per environment (never share dev/prod apps): Spotify, Google, GitHub, LinkedIn, Strava. Callback URL: `https://<your-domain>/api/auth/callback/<provider>` |
+| OAuth apps | One set per environment (never share dev/prod apps): Spotify, Google, GitHub, Strava. LinkedIn is optional (stub). Callback URL: `https://<your-domain>/api/auth/callback/<provider>` |
 | Domain | HTTPS required — OAuth providers reject plain HTTP callbacks |
 
 ## 2. Environment variables
@@ -28,7 +28,7 @@ crash the process immediately (fail fast, not half-booted).
 | `SPOTIFY_CLIENT_ID/_SECRET` | yes | |
 | `GITHUB_CLIENT_ID/_SECRET` | yes | |
 | `GOOGLE_CLIENT_ID/_SECRET` | yes | |
-| `LINKEDIN_CLIENT_ID/_SECRET` | yes | Required by the schema even though only sign-in is wired |
+| `LINKEDIN_CLIENT_ID/_SECRET` | no | Stub — no data fetcher yet; omit if unused |
 | `STRAVA_CLIENT_ID/_SECRET` | yes | |
 | `TELEGRAM_*`, `DUOLINGO_*`, `LETTERBOXD_*` | no | Stubs; safe to omit |
 | `WRAP_YEAR` | no | Pin the recap year; default is recap-season logic (`lib/wrapYear.ts`) |

@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { CONNECTABLE_SERVICES } from '@/lib/serviceCatalog';
 import { logAudit } from '@/lib/auditLog';
 
-/** Disconnects a service: removes the stored tokens/metadata for the current user. */
+/** Disconnects a service: removes stored tokens, metadata, and the NextAuth Account row. */
 export async function DELETE(
   _req: Request,
   { params }: { params: Promise<{ provider: string }> },
@@ -29,9 +29,17 @@ export async function DELETE(
     return NextResponse.json({ error: 'Not connected' }, { status: 404 });
   }
 
-  await prisma.connection.delete({
-    where: { userId_provider: { userId: session.user.id, provider } },
-  });
+  // Delete both the Connection row (our encrypted tokens + metadata) and
+  // the NextAuth Account row (raw OAuth tokens) so stale credentials
+  // cannot be silently reused on next sign-in.
+  await prisma.$transaction([
+    prisma.connection.delete({
+      where: { userId_provider: { userId: session.user.id, provider } },
+    }),
+    prisma.account.deleteMany({
+      where: { userId: session.user.id, provider },
+    }),
+  ]);
 
   await logAudit(session.user.id, 'connection.disconnect', {
     userEmail: session.user.email,

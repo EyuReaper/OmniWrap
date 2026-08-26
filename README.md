@@ -86,10 +86,9 @@ omniwrap/
 
 ## Privacy and Security
 
-- **Compliance:** GDPR/CCPA compliant.
-- **Storage:** Temporary data processing; no long-term raw data storage.
-- **Encryption:** All tokens are encrypted; user-controlled revocations and deletions.
-- **Integrity:** No selling or unauthorized sharing of personal data.
+- **Encryption:** All OAuth tokens are AES-256-GCM encrypted at rest; user-controlled revocations and deletions.
+- **Data access:** Users can export all their data or permanently delete their account at any time.
+- **Integrity:** No selling or unauthorized sharing of personal data. See our [Privacy Policy](https://omniwrap.app/privacy) for full details.
 
 ## Release and Update Schedule
 

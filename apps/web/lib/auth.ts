@@ -14,6 +14,7 @@ import { prisma } from "@/lib/prisma";
 import { env } from "@/lib/env";
 import { logAudit } from "@/lib/auditLog";
 import { syncConnectionFromAccount } from "@/lib/syncConnection";
+import type { Provider } from "next-auth/providers/index";
 
 /** Extra options merged into a provider stub by the caller. */
 type ProviderStubOptions = Record<string, unknown>;
@@ -74,48 +75,49 @@ export const LetterboxdProvider = (options: ProviderStubOptions) => ({
   ...options,
 });
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
-  adapter: PrismaAdapter(prisma),
-  providers: [
-    SpotifyProvider({
-      clientId: env.SPOTIFY_CLIENT_ID,
-      clientSecret: env.SPOTIFY_CLIENT_SECRET,
-      // Least privilege for the wrap fetcher: top items + recently played +
-      // the profile claims NextAuth needs. `playlist-*`, `user-follow-*`, and
-      // `user-library-*` are deliberately not requested.
-      authorization: {
-        params: { scope: "user-top-read user-read-recently-played user-read-email user-read-private" },
+// LinkedIn is included only when its env vars are set — it's a stub with no
+// data fetcher yet, so deployments that don't use it shouldn't need the vars.
+const oauthProviders: Provider[] = [
+  SpotifyProvider({
+    clientId: env.SPOTIFY_CLIENT_ID,
+    clientSecret: env.SPOTIFY_CLIENT_SECRET,
+    authorization: {
+      params: { scope: "user-top-read user-read-recently-played user-read-email user-read-private" },
+    },
+  }),
+  GoogleProvider({
+    clientId: env.GOOGLE_CLIENT_ID,
+    clientSecret: env.GOOGLE_CLIENT_SECRET,
+    authorization: {
+      params: {
+        scope: "https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile",
       },
-    }),
-    GoogleProvider({
-      clientId: env.GOOGLE_CLIENT_ID,
-      clientSecret: env.GOOGLE_CLIENT_SECRET,
-      authorization: {
-        params: {
-          scope: "https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile",
-        },
-      },
-    }),
-    GitHub({
-      clientId: env.GITHUB_CLIENT_ID,
-      clientSecret: env.GITHUB_CLIENT_SECRET,
-      // Default scope (public read-only) is the minimum for our fetcher —
-      // /user, /user/repos and /search/commits all work without private access.
-    }),
-    StravaProvider({
-      clientId: env.STRAVA_CLIENT_ID,
-      clientSecret: env.STRAVA_CLIENT_SECRET,
-      // `read` (profile) + `activity:read` (own activities) is the minimum the
-      // wrap fetcher needs. `activity:read_all` (private activities) is not
-      // requested — see docs/oauth-scopes.md.
-      authorization: { params: { scope: "read,activity:read" } },
-    }),
+    },
+  }),
+  GitHub({
+    clientId: env.GITHUB_CLIENT_ID,
+    clientSecret: env.GITHUB_CLIENT_SECRET,
+  }),
+  StravaProvider({
+    clientId: env.STRAVA_CLIENT_ID,
+    clientSecret: env.STRAVA_CLIENT_SECRET,
+    authorization: { params: { scope: "read,activity:read" } },
+  }),
+];
+
+if (env.LINKEDIN_CLIENT_ID && env.LINKEDIN_CLIENT_SECRET) {
+  oauthProviders.push(
     LinkedInProvider({
       clientId: env.LINKEDIN_CLIENT_ID,
       clientSecret: env.LINKEDIN_CLIENT_SECRET,
       authorization: { params: { scope: "openid profile email" } },
     }),
-  ],
+  );
+}
+
+export const { handlers, auth, signIn, signOut } = NextAuth({
+  adapter: PrismaAdapter(prisma),
+  providers: oauthProviders,
   secret: env.NEXTAUTH_SECRET,
   // NextAuth v5 refuses to trust the Host header in production by default,
   // which breaks `auth()` inside proxy.ts (Next 16 middleware) and the API

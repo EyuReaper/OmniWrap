@@ -22,9 +22,9 @@ export const envSchema = z.object({
   STRAVA_CLIENT_ID: z.string().min(1),
   STRAVA_CLIENT_SECRET: z.string().min(1),
 
-  //LinkedIn
-  LINKEDIN_CLIENT_ID: z.string().min(1),
-  LINKEDIN_CLIENT_SECRET: z.string().min(1),
+  //LinkedIn (stub — no data fetcher yet; optional until the integration ships)
+  LINKEDIN_CLIENT_ID: z.string().optional(),
+  LINKEDIN_CLIENT_SECRET: z.string().optional(),
 
   //Future Stubs (Optional)
   TELEGRAM_CLIENT_ID: z.string().optional(),

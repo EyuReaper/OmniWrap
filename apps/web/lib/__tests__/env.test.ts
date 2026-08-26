@@ -64,4 +64,23 @@ describe('Environment Schema (Zod)', () => {
       expect(result.data.TELEGRAM_CLIENT_ID).toBeUndefined();
     }
   });
+
+  it('should allow LinkedIn env vars to be omitted (stub provider)', () => {
+    const withoutLinkedIn = {
+      DATABASE_URL: validEnv.DATABASE_URL,
+      NEXTAUTH_SECRET: validEnv.NEXTAUTH_SECRET,
+      ENCRYPTION_KEY: validEnv.ENCRYPTION_KEY,
+      SPOTIFY_CLIENT_ID: validEnv.SPOTIFY_CLIENT_ID,
+      SPOTIFY_CLIENT_SECRET: validEnv.SPOTIFY_CLIENT_SECRET,
+      GITHUB_CLIENT_ID: validEnv.GITHUB_CLIENT_ID,
+      GITHUB_CLIENT_SECRET: validEnv.GITHUB_CLIENT_SECRET,
+      GOOGLE_CLIENT_ID: validEnv.GOOGLE_CLIENT_ID,
+      GOOGLE_CLIENT_SECRET: validEnv.GOOGLE_CLIENT_SECRET,
+      STRAVA_CLIENT_ID: validEnv.STRAVA_CLIENT_ID,
+      STRAVA_CLIENT_SECRET: validEnv.STRAVA_CLIENT_SECRET,
+      NODE_ENV: validEnv.NODE_ENV,
+    };
+    const result = envSchema.safeParse(withoutLinkedIn);
+    expect(result.success).toBe(true);
+  });
 });
