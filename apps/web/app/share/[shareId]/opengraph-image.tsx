@@ -34,7 +34,6 @@ export default async function ShareOpengraphImage({
         { label: 'Hours', value: `${snapshot.totalHours}` },
         ...(snapshot.commits !== undefined ? [{ label: 'Commits', value: `${snapshot.commits}` }] : []),
         ...(snapshot.distanceKm !== undefined ? [{ label: 'km', value: `${snapshot.distanceKm}` }] : []),
-        ...(snapshot.streakDays !== undefined ? [{ label: 'Streak', value: `${snapshot.streakDays}` }] : []),
       ].slice(0, 4)
     : [];
 

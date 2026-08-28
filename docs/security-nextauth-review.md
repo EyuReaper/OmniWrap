@@ -39,7 +39,7 @@ CSRF helpers to those routes.
 
 - [ ] Distributed rate limiting (Redis/Upstash) — current limiter resets per instance
 - [ ] Purge expired `Session`/`VerificationToken` rows on a schedule
-- [ ] Reconcile plaintext tokens in NextAuth `Account` vs encrypted `Connection` (P0 item)
+- [x] Reconcile plaintext tokens in NextAuth `Account` vs encrypted `Connection` (P0 item) — `Connection` is the single token authority (AES-256-GCM); the plaintext tokens the adapter writes to `Account` are cleared after copy (`lib/syncConnection.ts`). Revisit if NextAuth starts relying on `Account` tokens for refresh.
 - [ ] Pen test before public launch (P0 item — external work, not code)
 
 ## 4. Upgrade path off beta

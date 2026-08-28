@@ -37,12 +37,6 @@ export interface StravaData {
   elevationGain?: number;
 }
 
-export interface DuolingoData {
-  streakDays: number;
-  xp: number;
-  language: string;
-}
-
 export interface AggregatedData {
   totalHours: number;
   /** Real, time-based category (Music/Video) or absent when no time data exists. */
@@ -62,7 +56,6 @@ export interface WrapData {
   google?: YouTubeData;
   github?: GitHubData;
   strava?: StravaData;
-  duolingo?: DuolingoData;
   aggregated?: AggregatedData;
   providerStatus?: Record<string, ProviderStatus>;
 }
@@ -76,5 +69,4 @@ export interface PublicWrapSnapshot {
   topSong?: string;
   commits?: number;
   distanceKm?: number;
-  streakDays?: number;
 }

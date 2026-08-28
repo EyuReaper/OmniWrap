@@ -56,12 +56,12 @@ describe('Environment Schema (Zod)', () => {
     }
   });
 
-  it('should allow optional stubs like TELEGRAM_CLIENT_ID to be omitted', () => {
-    // validEnv intentionally omits optional TELEGRAM_*/DUOLINGO_*/LETTERBOXD_* keys
+  it('should allow optional stubs like TELEGRAM_WEBHOOK_SECRET to be omitted', () => {
+    // validEnv intentionally omits optional TELEGRAM_WEBHOOK_SECRET
     const result = envSchema.safeParse(validEnv);
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.TELEGRAM_CLIENT_ID).toBeUndefined();
+      expect(result.data.TELEGRAM_WEBHOOK_SECRET).toBeUndefined();
     }
   });
 

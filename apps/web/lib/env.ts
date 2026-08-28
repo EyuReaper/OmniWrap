@@ -26,14 +26,9 @@ export const envSchema = z.object({
   LINKEDIN_CLIENT_ID: z.string().optional(),
   LINKEDIN_CLIENT_SECRET: z.string().optional(),
 
-  //Future Stubs (Optional)
-  TELEGRAM_CLIENT_ID: z.string().optional(),
-  TELEGRAM_CLIENT_SECRET: z.string().optional(),
+  //Telegram webhook guard (used by app/api/webhooks/telegram). Optional — the
+  //endpoint stays disabled until an operator sets it.
   TELEGRAM_WEBHOOK_SECRET: z.string().optional(),
-  DUOLINGO_CLIENT_ID: z.string().optional(),
-  DUOLINGO_CLIENT_SECRET: z.string().optional(),
-  LETTERBOXD_CLIENT_ID: z.string().optional(),
-  LETTERBOXD_CLIENT_SECRET: z.string().optional(),
 
   //app
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),

@@ -185,7 +185,7 @@ export default function WrapExperience({
   }
 
   const hasAnyProviderData = Boolean(
-    data.spotify || data.google || data.github || data.strava || data.duolingo,
+    data.spotify || data.google || data.github || data.strava,
   );
   const failedProviders = Object.entries(data.providerStatus ?? {}).filter(([, s]) => !s.ok);
 
@@ -435,29 +435,6 @@ export default function WrapExperience({
                 <p className="text-6xl font-black">{data.strava.distanceKm} km</p>
                 <p className="text-xl opacity-60 mt-2">Conquered in {year}</p>
                 <p className="text-2xl font-bold mt-8 text-white/80">{data.strava.activities} Sessions across the year</p>
-              </div>
-            </motion.div>
-          </SwiperSlide>
-        )}
-
-        {/* Slide 6: Duolingo */}
-        {data.duolingo && (
-          <SwiperSlide className="flex items-center justify-center">
-            <motion.div initial={{ opacity: 0, scale: 1.2 }} animate={{ opacity: 1, scale: 1 }} className={`w-full max-w-4xl p-12 rounded-3xl border shadow-2xl mx-4 backdrop-blur-xl ${theme.card} ${theme.text}`}>
-              <h2 className={`text-5xl font-black mb-10 text-center text-[#58CC02]`}>Daily Streak</h2>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2 text-center py-10 bg-[#58CC02]/10 rounded-2xl border border-[#58CC02]/20">
-                  <p className="text-8xl font-black text-[#58CC02]">{data.duolingo.streakDays}</p>
-                  <p className="text-2xl font-bold">DAYS STREAK!</p>
-                </div>
-                <div className="text-center p-6 bg-white/5 rounded-2xl">
-                  <p className="text-3xl font-black">{data.duolingo.xp}</p>
-                  <p className="opacity-60">Total XP</p>
-                </div>
-                <div className="text-center p-6 bg-white/5 rounded-2xl">
-                  <p className="text-3xl font-black">{data.duolingo.language}</p>
-                  <p className="opacity-60">Language</p>
-                </div>
               </div>
             </motion.div>
           </SwiperSlide>

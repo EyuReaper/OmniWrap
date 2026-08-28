@@ -1,7 +1,7 @@
 'use client';
 
 import { signIn } from 'next-auth/react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -51,10 +51,6 @@ export default function DashboardClient({
   const [connections, setConnections] = useState<Record<string, ConnectionInfo>>(() =>
     toMap(initialConnections),
   );
-  const [activeManualService, setActiveManualService] = useState<string | null>(null);
-  const [duoUsername, setDuoUsername] = useState('');
-  const [duoSubmitting, setDuoSubmitting] = useState(false);
-  const [duoError, setDuoError] = useState<string | null>(null);
   const [disconnectTarget, setDisconnectTarget] = useState<ServiceDef | null>(null);
   const [disconnecting, setDisconnecting] = useState(false);
   const [isOffline, setIsOffline] = useState(() => typeof navigator !== 'undefined' && !navigator.onLine);
@@ -80,64 +76,9 @@ export default function DashboardClient({
     };
   }, [showToast]);
 
-  const refreshConnections = async () => {
-    try {
-      const res = await fetch('/api/connections');
-      if (!res.ok) throw new Error();
-      const data = (await res.json()) as { connections: ConnectionInfo[] };
-      const map = toMap(data.connections);
-      setConnections(map);
-      return map;
-    } catch {
-      showToast('Could not load your connection status.', 'error');
-      return null;
-    }
-  };
-
-  // While the Telegram modal is open on a pending link, poll for the bot-side confirmation.
-  useEffect(() => {
-    if (activeManualService !== 'telegram' || connections.telegram?.status !== 'pending') return;
-    const interval = setInterval(async () => {
-      const map = await refreshConnections();
-      if (map?.telegram?.status === 'connected') {
-        setActiveManualService(null);
-        showToast('Telegram connected!', 'success');
-      }
-    }, 4000);
-    return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeManualService, connections.telegram?.status]);
-
   const handleConnect = async (service: ServiceDef) => {
     if (isOffline) {
       showToast("You're offline. Reconnect and try again.", 'error');
-      return;
-    }
-
-    if (service.authType === 'manual') {
-      setActiveManualService(service.provider);
-      setDuoError(null);
-      if (service.provider === 'duolingo') {
-        setDuoUsername((connections.duolingo?.metadata?.username as string) || '');
-      }
-      if (service.provider === 'telegram' && connections.telegram?.status !== 'pending') {
-        try {
-          const res = await fetch('/api/connections/manual', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ provider: 'telegram' }),
-          });
-          if (!res.ok) throw new Error();
-          const data = await res.json();
-          setConnections((prev) => ({
-            ...prev,
-            telegram: { provider: 'telegram', status: 'pending', metadata: { linkCode: data.linkCode } },
-          }));
-        } catch {
-          showToast('Could not start Telegram linking. Please try again.', 'error');
-          setActiveManualService(null);
-        }
-      }
       return;
     }
 
@@ -146,39 +87,6 @@ export default function DashboardClient({
       await signIn(service.provider, { callbackUrl: '/dashboard' });
     } catch {
       showToast(`Could not connect ${service.name}. Please try again.`, 'error');
-    }
-  };
-
-  const handleDuolingoSubmit = async () => {
-    const trimmed = duoUsername.trim();
-    if (!trimmed) return;
-    if (isOffline) {
-      setDuoError("You're offline. Reconnect and try again.");
-      return;
-    }
-    setDuoSubmitting(true);
-    setDuoError(null);
-    try {
-      const res = await fetch('/api/connections/manual', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ provider: 'duolingo', username: trimmed }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setDuoError(data.error || 'Could not verify that username.');
-        return;
-      }
-      setConnections((prev) => ({
-        ...prev,
-        duolingo: { provider: 'duolingo', status: 'connected', metadata: data.metadata },
-      }));
-      setActiveManualService(null);
-      showToast('Duolingo connected!', 'success');
-    } catch {
-      setDuoError('Network error — check your connection and try again.');
-    } finally {
-      setDuoSubmitting(false);
     }
   };
 
@@ -388,96 +296,6 @@ export default function DashboardClient({
             );
           })}
         </div>
-
-        {/* Manual Connection Modal */}
-        <AnimatePresence>
-          {activeManualService && (
-            <div
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="manual-connect-title"
-              className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm"
-            >
-              <motion.div
-                initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                className="relative w-full max-w-md p-8 bg-gray-900 border border-white/10 rounded-3xl shadow-2xl"
-              >
-                <button
-                  onClick={() => setActiveManualService(null)}
-                  aria-label="Close dialog"
-                  className="absolute top-2 right-2 w-11 h-11 flex items-center justify-center text-gray-400 hover:text-white transition-colors"
-                >
-                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-
-                <div className="text-center">
-                  <h2 id="manual-connect-title" className="text-3xl font-black text-white mb-4">
-                    Connect {activeManualService.charAt(0).toUpperCase() + activeManualService.slice(1)}
-                  </h2>
-
-                  {activeManualService === 'telegram' ? (
-                    <div className="space-y-6">
-                      <p className="text-gray-400 leading-relaxed">
-                        To sync your social stats, send your unique code to our bot on Telegram.
-                      </p>
-                      <div className="p-4 bg-black/40 rounded-2xl border border-blue-500/30">
-                        <p className="text-xs text-blue-400 font-mono mb-2">TELEGRAM COMMAND</p>
-                        <code className="text-xl font-black text-white">
-                          /link {(connections.telegram?.metadata?.linkCode as string) || '…'}
-                        </code>
-                      </div>
-                      <Link
-                        href="https://t.me/OmniWrapBot"
-                        target="_blank"
-                        className="block w-full min-h-[44px] py-4 bg-[#0088CC] text-white font-bold rounded-2xl hover:bg-[#0077B5] transition-colors"
-                      >
-                        Open @OmniWrapBot
-                      </Link>
-                      <p className="text-xs text-gray-500" role="status">
-                        Waiting for confirmation from Telegram…
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="space-y-6">
-                      <p className="text-gray-400 leading-relaxed">
-                        Enter your Duolingo username to sync your learning streaks.
-                      </p>
-                      <label htmlFor="duolingo-username" className="sr-only">
-                        Duolingo username
-                      </label>
-                      <input
-                        id="duolingo-username"
-                        type="text"
-                        placeholder="@username"
-                        value={duoUsername}
-                        onChange={(e) => setDuoUsername(e.target.value)}
-                        aria-invalid={Boolean(duoError)}
-                        aria-describedby={duoError ? 'duolingo-error' : undefined}
-                        className="w-full p-4 min-h-[44px] bg-black/40 border border-white/10 rounded-2xl text-white placeholder-gray-600 focus:outline-none focus:border-[#58CC02]/50"
-                      />
-                      {duoError && (
-                        <p id="duolingo-error" role="alert" className="text-sm text-danger -mt-3">
-                          {duoError}
-                        </p>
-                      )}
-                      <button
-                        onClick={handleDuolingoSubmit}
-                        disabled={!duoUsername.trim() || duoSubmitting || isOffline}
-                        className="w-full min-h-[44px] py-4 bg-[#58CC02] text-white font-bold rounded-2xl hover:bg-[#4CAF00] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {duoSubmitting ? 'Verifying…' : 'Save Username'}
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </motion.div>
-            </div>
-          )}
-        </AnimatePresence>
 
         <ConfirmDialog
           open={disconnectTarget !== null}

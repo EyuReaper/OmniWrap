@@ -18,6 +18,5 @@ export function buildPublicSnapshot(
     topSong: data.spotify?.topSong,
     commits: data.github?.commits,
     distanceKm: data.strava?.distanceKm,
-    streakDays: data.duolingo?.streakDays,
   };
 }

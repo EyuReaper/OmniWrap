@@ -22,20 +22,26 @@ sign-ins.
 | Strava | `read` `activity:read` | Profile name + own activity summaries for the fitness slide | `activity:read_all` (private-only activities), `profile:write`, `activity:write` |
 | LinkedIn | `openid` `profile` `email` | Sign-in identity only. There is no LinkedIn data fetcher yet; if one ships it must justify its scopes here | `w_member_social` and everything else |
 
-## Manual / stub providers
+## Coming-soon providers
 
-- **Duolingo** — manual username flow (`app/api/connections/manual/route.ts`),
-  no OAuth scope involved.
-- **Telegram** — webhook-based stub; guarded by `TELEGRAM_WEBHOOK_SECRET`,
-  no user OAuth.
-- **Letterboxd** — provider stub defined but not wired into `providers`; no
-  scopes are live.
+Telegram, Duolingo, and Letterboxd have **no live integration** yet — they are
+marked `comingSoon` in `apps/web/lib/serviceCatalog.ts` (dashboard shows a
+disabled "Coming soon" tile, no connect button). Their OAuth provider stubs
+were removed from `apps/web/lib/auth.ts`; nothing in `providers` targets them.
+Re-add a provider here (and a fetcher in `lib/services/`) only when a real API
+exists. The guarded `app/api/connections/manual/route.ts` and Telegram webhook
+route remain but are unreachable from the UI and reject requests when
+`MANUAL_PROVIDERS` is empty.
 
 ## Rotation / revocation notes
 
 - Tokens are re-encrypted (AES-256-GCM) and stored per-user in `Connection`;
   refresh uses each provider's token endpoint with the same scope set (scopes
   cannot be narrowed on refresh without user consent).
+- `Connection` is the **single token authority**. The plaintext copies NextAuth
+  writes to the `Account` table during sign-in are cleared after they are
+  copied into `Connection` (see `lib/syncConnection.ts`), so plaintext OAuth
+  tokens are never persisted long-term.
 - Users revoke via the dashboard disconnect button **and** should be pointed
   at the provider's own app-permissions page:
   - Spotify: <https://www.spotify.com/account/apps/>

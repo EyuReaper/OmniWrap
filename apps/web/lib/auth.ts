@@ -16,66 +16,11 @@ import { logAudit } from "@/lib/auditLog";
 import { syncConnectionFromAccount } from "@/lib/syncConnection";
 import type { Provider } from "next-auth/providers/index";
 
-/** Extra options merged into a provider stub by the caller. */
-type ProviderStubOptions = Record<string, unknown>;
+// Telegram/Duolingo/Letterboxd have no real data integration yet (see
+// serviceCatalog) — they are marked "Coming soon" in the dashboard and are NOT
+// wired into `providers` below. No OAuth provider stubs are defined for them;
+// once a real API exists, add the provider here and the service in lib/services.
 
-interface TelegramProfile {
-  id: number | string;
-  first_name?: string;
-  last_name?: string;
-  username?: string;
-  email?: string | null;
-  photo_url?: string | null;
-}
-
-// Custom provider stubs — none of these are wired into `providers` below,
-// because the upstream APIs either don't exist or aren't implemented yet.
-// Telegram and Duolingo are handled as manual connections instead
-// (see app/api/connections/manual/route.ts).
-export const TelegramProvider = (options: ProviderStubOptions) => ({
-  id: "telegram",
-  name: "Telegram",
-  type: "oauth",
-  clientId: env.TELEGRAM_CLIENT_ID,
-  clientSecret: env.TELEGRAM_CLIENT_SECRET,
-  authorization: { url: "https://oauth.telegram.org/authorize", params: { scope: "" } },
-  token: "https://oauth.telegram.org/token",
-  userinfo: "https://oauth.telegram.org/userinfo",
-  profile(profile: TelegramProfile) {
-    return {
-      id: profile.id.toString(),
-      name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || profile.username,
-      email: profile.email || null,
-      image: profile.photo_url || null,
-    };
-  },
-  ...options,
-});
-
-export const DuolingoProvider = (options: ProviderStubOptions) => ({
-  id: "duolingo",
-  name: "Duolingo",
-  type: "oauth",
-  clientId: env.DUOLINGO_CLIENT_ID,
-  clientSecret: env.DUOLINGO_CLIENT_SECRET,
-  authorization: "https://www.duolingo.com/oauth2/authorize",
-  token: "https://www.duolingo.com/oauth2/token",
-  userinfo: "https://www.duolingo.com/2017-06-30/users/show",
-  ...options,
-});
-
-export const LetterboxdProvider = (options: ProviderStubOptions) => ({
-  id: "letterboxd",
-  name: "Letterboxd",
-  type: "oauth",
-  clientId: env.LETTERBOXD_CLIENT_ID,
-  clientSecret: env.LETTERBOXD_CLIENT_SECRET,
-  authorization: "https://api.letterboxd.com/api/v0/auth/token",
-  token: "https://api.letterboxd.com/api/v0/auth/token",
-  ...options,
-});
-
-// LinkedIn is included only when its env vars are set — it's a stub with no
 // data fetcher yet, so deployments that don't use it shouldn't need the vars.
 const oauthProviders: Provider[] = [
   SpotifyProvider({

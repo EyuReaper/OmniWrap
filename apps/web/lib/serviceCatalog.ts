@@ -66,7 +66,7 @@ export const SERVICES: ServiceDef[] = [
   {
     name: 'Telegram',
     provider: 'telegram',
-    authType: 'manual',
+    authType: 'comingSoon',
     color: 'from-[#0088CC]/30 to-[#229ED9]/10',
     glow: 'shadow-[0_0_25px_#0088CC60]',
     icon: 'https://upload.wikimedia.org/wikipedia/commons/8/82/Telegram_logo.svg',
@@ -75,7 +75,7 @@ export const SERVICES: ServiceDef[] = [
   {
     name: 'Duolingo',
     provider: 'duolingo',
-    authType: 'manual',
+    authType: 'comingSoon',
     color: 'from-[#58CC02]/30 to-[#7ACF00]/10',
     glow: 'shadow-[0_0_25px_#58CC0260]',
     icon: 'https://design.duolingo.com/0ae09c1b67d1113e0ac1.svg',

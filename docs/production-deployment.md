@@ -30,7 +30,7 @@ crash the process immediately (fail fast, not half-booted).
 | `GOOGLE_CLIENT_ID/_SECRET` | yes | |
 | `LINKEDIN_CLIENT_ID/_SECRET` | no | Stub — no data fetcher yet; omit if unused |
 | `STRAVA_CLIENT_ID/_SECRET` | yes | |
-| `TELEGRAM_*`, `DUOLINGO_*`, `LETTERBOXD_*` | no | Stubs; safe to omit |
+| `TELEGRAM_WEBHOOK_SECRET` | no | Telegram is "coming soon" (no live integration); this guards the webhook route and is only needed if a bot is wired up |
 | `WRAP_YEAR` | no | Pin the recap year; default is recap-season logic (`lib/wrapYear.ts`) |
 | `SENTRY_DSN` | no | Enables error forwarding via `lib/errorMonitoring.ts` |
 | `NEXTAUTH_URL` | recommended | Canonical origin when behind proxies/CDNs |

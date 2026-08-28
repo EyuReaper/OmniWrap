@@ -47,7 +47,6 @@ export default async function SharedWrapPage({
   if (snapshot.topSong) stats.push({ label: 'Top Track', value: snapshot.topSong });
   if (snapshot.commits !== undefined) stats.push({ label: 'Code Commits', value: `${snapshot.commits}` });
   if (snapshot.distanceKm !== undefined) stats.push({ label: 'Distance', value: `${snapshot.distanceKm}km` });
-  if (snapshot.streakDays !== undefined) stats.push({ label: 'Streak', value: `${snapshot.streakDays} days` });
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background text-foreground px-6 py-16">
