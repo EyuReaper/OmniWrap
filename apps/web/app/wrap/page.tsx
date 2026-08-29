@@ -8,12 +8,25 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { SITE_URL } from '@/lib/site';
 import { WrapData } from '@/lib/types';
-import { getWrapYear } from '@/lib/wrapYear';
+import { getWrapYear, isValidWrapYear } from '@/lib/wrapYear';
 import WrapExperience, { InitialShareState } from './WrapExperience';
 
-export default async function WrapPage() {
-  const session = await auth();
-  const year = getWrapYear();
+// Deep-linkable slide moments (?slide=spotify). Ignored unless it maps to a
+// slide key WrapExperience understands.
+const KNOWN_SLIDE_KEYS = ['intro', 'ready', 'spotify', 'google', 'github', 'strava', 'reconnect', 'legend', 'share'];
+
+export default async function WrapPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ year?: string; slide?: string }>;
+}) {
+  const [session, params] = await Promise.all([auth(), searchParams]);
+
+  // ?year= deep links choose the wrap year; otherwise fall back to the
+  // recap-season year so /wrap and /dashboard always agree.
+  const requestedYear = Number(params?.year);
+  const year = Number.isFinite(requestedYear) && isValidWrapYear(requestedYear) ? requestedYear : getWrapYear();
+  const initialSlideKey = typeof params?.slide === 'string' && KNOWN_SLIDE_KEYS.includes(params.slide) ? params.slide : null;
 
   if (!session?.user?.id) {
     return (
@@ -31,11 +44,20 @@ export default async function WrapPage() {
     );
   }
 
-  // Covered by the @@unique([userId, year]) index on Wrap.
-  const wrap = await prisma.wrap.findUnique({
-    where: { userId_year: { userId: session.user.id, year } },
-    select: { data: true, isPublic: true, shareId: true },
-  });
+  // Covered by the @@unique([userId, year]) index on Wrap. The year list powers
+  // the wrap's year selector when the user has more than one annual wrap.
+  const [wrap, yearRows] = await Promise.all([
+    prisma.wrap.findUnique({
+      where: { userId_year: { userId: session.user.id, year } },
+      select: { data: true, isPublic: true, shareId: true, createdAt: true },
+    }),
+    prisma.wrap.findMany({
+      where: { userId: session.user.id },
+      select: { year: true },
+      distinct: ['year'],
+      orderBy: { year: 'desc' },
+    }),
+  ]);
 
   const initialShare: InitialShareState = {
     isPublic: wrap?.isPublic ?? false,
@@ -47,6 +69,9 @@ export default async function WrapPage() {
       initialData={(wrap?.data as WrapData | undefined) ?? null}
       initialShare={initialShare}
       year={year}
+      initialGeneratedAt={wrap?.createdAt.toISOString() ?? null}
+      availableYears={yearRows.map((w) => w.year)}
+      initialSlideKey={initialSlideKey}
     />
   );
 }

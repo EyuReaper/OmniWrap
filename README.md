@@ -1,112 +1,89 @@
 # OmniWrap
 
-OmniWrap is a centralized, all-in-one year-in-review platform that aggregates personalized "Wrapped"-style summaries from multiple digital services. It combines data from music streaming, video platforms, fitness apps, social media, gaming, learning tools, and more into a single, visually engaging, holistic recap of your digital year.
+OmniWrap is a year-in-review platform that aggregates personalized "Wrapped"-style summaries from the digital services you actually use. It combines data from music streaming, video platforms, fitness apps, and coding services into a single, visually engaging recap of your digital year.
 
 ## Overview
 
-Inspired by individual service recaps (e.g., Spotify Wrapped, Apple Music Replay, YouTube Recap, Strava Year in Sport), OmniWrap provides cross-category insights, such as total time spent across listening, watching, exercising, and gaming, eliminating the need to check each app separately.
-
-As of December 24, 2025, the 2025 recap season is fully underway—most major services have released their individual recaps, making it the perfect time to generate your unified OmniWrap.
+Inspired by individual service recaps (e.g., Spotify Wrapped, Apple Music Replay, YouTube Recap, Strava Year in Sport), OmniWrap gives you cross-category insights such as total tracked time across listening and watching, without having to check each app separately.
 
 ## Project Folder Structure
 
-A recommended monorepo structure for building OmniWrap using Next.js (frontend + API routes), with optional separation for backend services:
-
 ```text
 omniwrap/
-├── .github/                  # GitHub workflows (CI/CD)
+├── .github/                  # GitHub workflows (CI) and Dependabot config
 ├── apps/
 │   └── web/                  # Next.js app (frontend + serverless API)
-│       ├── app/              # Next.js App Router pages
-│       │   ├── (auth)/       # Auth routes (login, callback)
-│       │   ├── dashboard/    # User dashboard, connections
-│       │   ├── wrap/         # Wrap generation and view
-│       │   └── api/          # Serverless API routes (e.g., oauth callbacks)
-│       ├── components/       # Reusable UI components (cards, charts)
-│       ├── lib/              # Utilities (OAuth helpers, data processors)
-│       ├── public/           # Static assets (images, themes)
-│       └── styles/           # Global styles
-├── packages/
-│   ├── ui/                   # Shared UI components (if multi-app)
-│   └── config/               # Shared config (env, types)
-├── prisma/                   # Database schema (if using Prisma)
-├── scripts/                  # Deployment scripts, data migration
+│       ├── app/              # Next.js App Router pages + API routes
+│       ├── components/       # Reusable UI components
+│       ├── e2e/              # Playwright end-to-end tests
+│       ├── lib/              # Auth, service fetchers, aggregation, utils
+│       └── public/           # Static assets
+├── prisma/                   # Database schema + migrations
+├── scripts/                  # Developer tooling
 ├── .env.example              # Environment variables template
-├── next.config.js            # Next.js config
-├── package.json              # Root dependencies
-├── tsconfig.json             # TypeScript config
-└── README.md                 # Project overview
+└── package.json              # Root workspace + scripts
 ```
 
-- **Backend-heavy alternative:** Separate `apps/api` (Node/Express or Fastify) for persistent services, background jobs (e.g., data refresh queues).
-- **Database:** Use Supabase, PlanetScale, or Render Postgres for user data, tokens, and cached wraps.
+- **Backend:** Serverless API routes for OAuth callbacks, data fetching, and wrap aggregation.
+- **Database:** Postgres (Prisma) for users, connections, and cached wraps. OAuth refresh tokens are AES-256-GCM encrypted at rest.
 
 ## Architecture and Technical Structure
 
-- **Frontend:** Next.js 14+ (App Router) for SSR/SSG, responsive UI with Tailwind CSS. Interactive story-like flow using Framer Motion or Swiper.
-- **Backend:** Serverless functions for OAuth flows, data fetching, and aggregation. Optional dedicated server for heavy processing.
-- **Database:** Relational (Postgres) for users, connections, and preferences. Secure storage of refresh tokens (encrypted).
-- **Authentication:**
-    - **OmniWrap accounts:** NextAuth.js or Clerk (supports email, Google/Apple sign-in).
-    - **Service integrations:** OAuth 2.0 with PKCE.
-- **Data Processing:** Secure, on-demand fetching via service APIs. Temporary in-memory aggregation; optional caching for performance.
-- **Deployment:**
-    - **Recommended:** Vercel for Next.js optimization, previews, and edge caching.
-    - **Alternative/Hybrid:** Render for managed Postgres, background workers, or Docker containers.
-- **CI/CD:** GitHub Actions for automated tests/deploys.
+- **Frontend:** Next.js 16 (App Router) with Server Components; the interactive wrap playback is a client island (Swiper + Framer Motion + Recharts).
+- **Authentication:** NextAuth v5 (beta) with database sessions. OmniWrap accounts are OAuth-only — no passwords.
+- **Service integrations:** OAuth 2.0 with per-service least-privilege scopes.
+- **Data Processing:** On-demand fetching via service APIs, retried with backoff. Wraps are cached per user per year with stale-while-revalidate.
+- **Deployment:** Vercel (frontend + API) with managed Postgres. See `docs/production-deployment.md`.
 
 ## Key Features
 
-### Supported Integrations
-- **Music:** Spotify, Apple Music, YouTube Music
-- **Video/Entertainment:** YouTube, Netflix (via manual exports)
-- **Fitness/Health:** Strava, Fitbit, Apple Health
-- **Social/Community:** Reddit, X/Twitter, Instagram
-- **Learning/Productivity:** Duolingo, Goodreads, RescueTime
-- **Gaming:** Steam, PlayStation, Xbox
+### Live integrations
+- **Spotify** — top artist, top track, listening time (estimated from recently played tracks)
+- **YouTube** — top liked video, watch time (estimated from liked videos), top category
+- **GitHub** — total commits, top repository, languages
+- **Strava** — total distance, activities, athletes' year in full (paginated)
 
-### Unified Recap
-- Aggregated metrics (e.g., total hours across categories)
-- Top lists, milestones, and trends
-- Year-over-year comparisons (if historical data available)
-- Customizable themes and focus areas
+**LinkedIn** connects via OAuth but currently contributes no wrap data. **Telegram**, **Duolingo**, and **Letterboxd** are marked "Coming soon" until real APIs exist. All metrics are fetched from real provider APIs — never fabricated — and the UI labels clearly what is estimated.
+
+### The wrap
+- Immersive story-style playback with keyboard navigation, slide progress, and screen-reader announcements
+- Per-provider slides that tell you exactly what's missing ("Connect Spotify to unlock")
+- Honest aggregation: only real, measured time counts toward hours; commits and km appear as their own counts
+- Multiple themes for the share card (Omni Dark, Cyberpunk, Sunset, Minimal)
+- Wraps are generated per calendar year and can be re-viewed or re-connected to previous years
+- Public share snapshots (opt-in) with generated Open Graph images
 
 ### Sharing
-- Social-optimized images/stories, friend comparisons (opt-in)
-
-### Extras
-- Global anonymized trends, export options (PDF, images)
-
-## Authentication and Data Integration
-
-- **Primary:** OAuth 2.0 (PKCE) for all supported services—secure, compliant, no password handling.
-- **Why OAuth?:** Required by platforms, allows revocable access, and builds user trust.
-- **Fallbacks:** Manual data uploads (CSV/JSON exports) for limited-API services; public profile links where available.
-- **User Accounts:** Required for saving connections/preferences. Guest mode is available for one-time wraps.
+- Download share cards in Card / Square (1:1) / Story (9:16) formats with optional watermark
+- Native share sheet (Web Share API), copy link, and "Share to X"
+- Copy a deep link to any slide (e.g. `?slide=spotify`)
 
 ## Privacy and Security
 
-- **Encryption:** All OAuth tokens are AES-256-GCM encrypted at rest; user-controlled revocations and deletions.
-- **Data access:** Users can export all their data or permanently delete their account at any time.
-- **Integrity:** No selling or unauthorized sharing of personal data. See our [Privacy Policy](https://omniwrap.app/privacy) for full details.
-
-## Release and Update Schedule
-
-OmniWrap aligns with the year-end recap season for maximum data availability:
-- **Primary Generation Window:** Late November to mid-January.
-- **Starts:** ~November 25 (e.g., YouTube Music Recap).
-- **Peaks:** early December (Apple Music Replay Dec 2, Spotify Wrapped Dec 3, YouTube Recap Dec 2).
-- **Continues:** mid-December+ (Strava Year in Sport ~Dec 8, others into January).
-- **On-Demand:** Available year-round for custom periods or previous years.
-- **Auto-Refresh:** Notifications when new data releases from connected services.
-- **Data Cutoff:** Mirrors sources (typically mid-November to early December).
-- **Wrap Availability:** Stored indefinitely for logged-in users.
+- **Encryption:** OAuth tokens are AES-256-GCM encrypted at rest; refresh tokens rotate with reuse tracking.
+- **Data control:** Export all your data or permanently delete your account at any time; disconnect individual services.
+- **Integrity:** No selling or unauthorized sharing of personal data. See [Privacy Policy](https://omniwrap.app/privacy) and [Terms](https://omniwrap.app/terms).
+- **Audit logging:** Sensitive actions (connect/disconnect/delete/export) are recorded.
 
 ## Getting Started
 
-- Visit omniwrap.vercel.app and sign up/login.
-- Connect services via secure OAuth.
-- Generate your unified wrap.
-- Customize, view, and share.
+1. Visit the app, sign in with any of the supported OAuth providers, and connect your services.
+2. Open the dashboard and hit **Generate Your Wrap**.
+3. View your recap, switch themes, and share it.
 
-*Note: Basic features are free; premium tiers are available for advanced options like early access and deeper analytics.*
+## Development
+
+From the repo root:
+
+```bash
+npm install          # installs the full workspace (one lockfile at the root)
+npm run dev          # dev server at localhost:3000
+npm run lint         # ESLint
+npm run typecheck    # TypeScript (tsc --noEmit)
+npm run test         # unit tests (Vitest)
+npm run build        # production build
+```
+
+Prisma commands run from the root via `npx prisma <cmd>`. See `AGENTS.md` for the full contributing guide, environment variables, and the production-readiness checklist.
+
+*OmniWrap is a single-tier product — no premium plans, no guest mode.*
