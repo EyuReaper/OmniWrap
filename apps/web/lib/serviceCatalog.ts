@@ -15,6 +15,8 @@ export interface ServiceDef {
   glow: string;
   icon: string;
   accent: string;
+  /** URL to the provider's third-party app permissions page so users can revoke access at the source. */
+  revokeUrl?: string;
 }
 
 export const SERVICES: ServiceDef[] = [
@@ -26,6 +28,7 @@ export const SERVICES: ServiceDef[] = [
     glow: 'shadow-[0_0_25px_#1DB95460]',
     icon: 'https://cdn-icons-png.flaticon.com/512/174/174872.png',
     accent: '#1DB954',
+    revokeUrl: 'https://www.spotify.com/account/apps/',
   },
   {
     name: 'YouTube',
@@ -35,6 +38,7 @@ export const SERVICES: ServiceDef[] = [
     glow: 'shadow-[0_0_25px_#FF000060]',
     icon: 'https://cdn-icons-png.flaticon.com/512/1384/1384060.png',
     accent: '#FF0000',
+    revokeUrl: 'https://myaccount.google.com/connections',
   },
   {
     name: 'GitHub',
@@ -44,6 +48,7 @@ export const SERVICES: ServiceDef[] = [
     glow: 'shadow-[0_0_25px_#6F42C180]',
     icon: 'https://cdn-icons-png.flaticon.com/512/25/25231.png',
     accent: '#6F42C1',
+    revokeUrl: 'https://github.com/settings/applications',
   },
   {
     name: 'Strava',
@@ -53,6 +58,7 @@ export const SERVICES: ServiceDef[] = [
     glow: 'shadow-[0_0_25px_#FC4C0260]',
     icon: 'https://upload.wikimedia.org/wikipedia/commons/c/cb/Strava_Logo.svg',
     accent: '#FC4C02',
+    revokeUrl: 'https://www.strava.com/settings/apps',
   },
   {
     name: 'LinkedIn',
@@ -62,6 +68,7 @@ export const SERVICES: ServiceDef[] = [
     glow: 'shadow-[0_0_25px_#0A66C260]',
     icon: 'https://upload.wikimedia.org/wikipedia/commons/c/ca/LinkedIn_logo_initials.png',
     accent: '#0A66C2',
+    revokeUrl: 'https://www.linkedin.com/mypreferences/d/data-sharing-for-permitted-services',
   },
   {
     name: 'Telegram',
